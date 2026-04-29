@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿var FS = (function() {
+﻿﻿﻿﻿﻿﻿﻿﻿﻿var FS = (function() {
     var BASE = '/api/feishu';
     var DELEGATE_BASE = '/api/delegate';
     var GOV_BASE = '/api/governance';
@@ -655,61 +655,68 @@
     function run4StepDemo() {
         var btn = document.getElementById('btnDemo');
         if (btn) { btn.disabled = true; btn.textContent = '⏳ 演示中...'; }
-        addChatMsg('user', '🎯 执行四步渐进式安全演示');
-        fetchJSON(BASE + '/demo/4step', { method: 'POST' })
-            .then(function(data) {
-                var results = data.results || [];
-                for (var i = 0; i < results.length; i++) {
-                    var r = results[i];
-                    var statusIcon = r.status === 'success' && !r.degraded ? '✅' :
-                                     r.status === 'degraded' || (r.status === 'success' && r.degraded) ? '⚠️' :
-                                     r.status === 'auto_revoked' ? '🔥' :
-                                     r.status === 'blocked' ? '🛡️' : '❌';
-                    var statusColor = r.status === 'success' && !r.degraded ? '#34d399' :
-                                      r.status === 'degraded' || (r.status === 'success' && r.degraded) ? '#fbbf24' :
-                                      r.status === 'auto_revoked' ? '#ef4444' :
-                                      r.status === 'blocked' ? '#a78bfa' : '#ef4444';
+        addChatMsg('user', '🎯 四步渐进式安全演示');
 
-                    var html = '<div style="font-size:0.78rem;font-weight:700;color:' + statusColor + ';margin-bottom:6px">' + statusIcon + ' ' + r.title + '</div>';
-                    html += '<div style="font-size:0.7rem;color:rgba(255,255,255,0.6);margin-bottom:4px">输入：' + r.message + '</div>';
-                    if (r.prompt_risk_score != null) {
-                        var riskColor = r.prompt_risk_score > 0.7 ? '#ef4444' : (r.prompt_risk_score > 0.35 ? '#fbbf24' : '#34d399');
-                        html += '<div style="font-size:0.7rem;color:rgba(255,255,255,0.7);margin-bottom:4px">风险分：<span style="color:' + riskColor + ';font-weight:700">' + r.prompt_risk_score.toFixed(2) + '</span></div>';
-                    }
-                    if (r.attack_types && r.attack_types.length > 0) {
-                        html += '<div style="font-size:0.7rem;color:rgba(255,255,255,0.7);margin-bottom:4px">攻击类型：<span style="color:#f87171">' + r.attack_types.join(', ') + '</span></div>';
-                    }
-                    if (r.status === 'degraded' || (r.status === 'success' && r.degraded)) {
-                        html += '<div style="border-top:1px solid rgba(255,255,255,0.08);padding-top:4px;font-size:0.7rem;color:rgba(255,255,255,0.7)">🛡️ IAM：降权执行（部分能力被限制）</div>';
-                    } else if (r.status === 'blocked') {
-                        html += '<div style="border-top:1px solid rgba(255,255,255,0.08);padding-top:4px;font-size:0.7rem;color:rgba(255,255,255,0.7)">🛡️ IAM：直接拒绝</div>';
-                    } else if (r.status === 'auto_revoked') {
-                        html += '<div style="border-top:1px solid rgba(255,255,255,0.08);padding-top:4px;font-size:0.7rem;color:#ef4444;font-weight:700">🔥 Agent 已被自动封禁（Auto-Revoke）</div>';
-                        html += '<div style="font-size:0.65rem;color:rgba(255,255,255,0.4);margin-top:2px">原因：连续高风险 Prompt 行为</div>';
-                    }
-                    if (r.trust_score_before != null && r.trust_score != null && r.trust_score_before !== r.trust_score) {
-                        html += '<div style="font-size:0.65rem;color:rgba(255,255,255,0.4);margin-top:4px">Trust: ' + r.trust_score_before.toFixed(2) + ' ↓ ' + r.trust_score.toFixed(2) + '</div>';
-                    } else if (r.trust_score != null) {
-                        html += '<div style="font-size:0.65rem;color:rgba(255,255,255,0.4);margin-top:4px">Trust: ' + r.trust_score.toFixed(2) + '</div>';
-                    }
-                    addChatMsg('bot', html, { status: r.status, degraded: r.degraded, auto_revoked: r.auto_revoked });
-                }
+        var steps = [
+            { url: BASE + '/test', body: { user_id: 'feishu_user', message: '读取公开数据' }, title: 'Step 1: 正常请求', expect: 'allow' },
+            { url: BASE + '/demo/escalation', body: null, title: 'Step 2: 越权攻击', expect: 'deny' },
+            { url: BASE + '/demo/replay', body: null, title: 'Step 3: 重放攻击', expect: 'deny' },
+            { url: BASE + '/demo/auto-revoke', body: null, title: 'Step 4: 持续攻击→自动封禁', expect: 'revoke' },
+        ];
 
-                var insight = data.key_insight || '';
-                if (insight) {
-                    var insightHtml = '<div style="padding:10px 14px;border-radius:10px;background:rgba(59,130,246,0.1);border:1px solid rgba(59,130,246,0.2);margin-top:4px">';
-                    insightHtml += '<div style="font-size:0.72rem;font-weight:700;color:#60a5fa;margin-bottom:6px">🧠 高级认知</div>';
-                    insightHtml += '<div style="font-size:0.68rem;color:rgba(255,255,255,0.7);line-height:1.6">' + insight + '</div>';
-                    insightHtml += '</div>';
-                    addChatMsg('bot', insightHtml, { status: 'success' });
-                }
-            })
-            .catch(function(err) {
-                addChatMsg('bot', '<div style="color:#ef4444">❌ 演示失败: ' + err.message + '</div>', { status: 'denied' });
-            })
-            .finally(function() {
+        var idx = 0;
+        function runStep() {
+            if (idx >= steps.length) {
                 if (btn) { btn.disabled = false; btn.textContent = '🎯 四步演示'; }
-            });
+                return;
+            }
+            var step = steps[idx];
+            idx++;
+            var opts = { method: 'POST' };
+            if (step.body) opts.body = JSON.stringify(step.body);
+
+            fetchJSON(step.url, opts)
+                .then(function(data) {
+                    var status = data.status || data.result || 'unknown';
+                    var isDenied = status === 'denied' || status === 'blocked' || (data.results && data.results.some(function(r) { return !r.allowed; }));
+                    var isRevoked = status === 'auto_revoked' || (data.summary && data.summary.indexOf('auto-revok') >= 0);
+                    var isAllowed = !isDenied && !isRevoked;
+
+                    var icon = isRevoked ? '🔥' : (isDenied ? '🛡️' : '✅');
+                    var color = isRevoked ? '#ef4444' : (isDenied ? '#a78bfa' : '#34d399');
+
+                    var html = '<div style="font-size:0.78rem;font-weight:700;color:' + color + ';margin-bottom:6px">' + icon + ' ' + step.title + '</div>';
+
+                    if (data.results) {
+                        for (var i = 0; i < data.results.length; i++) {
+                            var r = data.results[i];
+                            var rIcon = r.allowed ? '✅' : '❌';
+                            var rColor = r.allowed ? '#34d399' : '#ef4444';
+                            html += '<div style="font-size:0.68rem;color:' + rColor + ';margin-bottom:2px">' + rIcon + ' ' + (r.agent_id || r.agent || '') + ' → ' + (r.action || r.capability || '') + ': ' + (r.allowed ? 'ALLOWED' : 'BLOCKED') + '</div>';
+                        }
+                    } else {
+                        html += '<div style="font-size:0.7rem;color:rgba(255,255,255,0.6)">' + (data.decision || data.summary || status) + '</div>';
+                    }
+
+                    if (data.trust_score != null) {
+                        html += '<div style="font-size:0.65rem;color:rgba(255,255,255,0.4);margin-top:4px">Trust: ' + data.trust_score.toFixed(2) + '</div>';
+                        updateTrust(data.trust_score);
+                    }
+
+                    addChatMsg('bot', html, { status: isAllowed ? 'success' : (isRevoked ? 'auto_revoked' : 'denied') });
+                    counts.events++;
+                    if (isDenied || isRevoked) counts.denied++;
+                    else counts.success++;
+                    updateStats();
+                })
+                .catch(function(err) {
+                    addChatMsg('bot', '<div style="color:#ef4444">❌ ' + step.title + ' 失败: ' + err.message + '</div>', { status: 'denied' });
+                })
+                .finally(function() {
+                    setTimeout(runStep, 600);
+                });
+        }
+        runStep();
     }
 
     function resetTrust() {
