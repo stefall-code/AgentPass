@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿var FS = (function() {
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿var FS = (function() {
     var BASE = '/api/feishu';
     var DELEGATE_BASE = '/api/delegate';
     var GOV_BASE = '/api/governance';
@@ -314,12 +314,64 @@
             });
 
             var status = result.status || 'unknown';
-            var content = result.content || '处理完成';
+            var content = result.content || '';
             var chain = result.chain || [];
             var attackType = result.attack_type || null;
             lastResultData = result;
 
-            addChatMsg('bot', content, result);
+            var isDenied = status === 'denied' || status === 'auto_revoked' || status === 'blocked';
+            var isRevoked = status === 'auto_revoked';
+            var isAllowed = status === 'success';
+
+            var statusIcon = isRevoked ? '🔥' : (isDenied ? '🛡️' : '✅');
+            var statusColor = isRevoked ? '#ef4444' : (isDenied ? '#a78bfa' : '#34d399');
+            var statusLabel = isRevoked ? 'AUTO-REVOKED' : (isDenied ? 'DENIED' : 'ALLOWED');
+
+            var botHtml = '<div style="margin-bottom:8px">';
+            botHtml += '<div style="font-size:0.82rem;font-weight:700;color:' + statusColor + ';margin-bottom:6px">' + statusIcon + ' ' + statusLabel + '</div>';
+
+            var cleanContent = content
+                .replace(/Chain\s*[—\-]\s*/g, '')
+                .replace(/Capability\s*[—\-]\s*/g, '')
+                .replace(/Trust Score\s*[—\-]\s*/g, '')
+                .replace(/Blocked At\s*[—\-]\s*/g, '')
+                .replace(/Auto Revoked\s*[—\-]\s*/g, '')
+                .replace(/Attack Type\s*[—\-]\s*/g, '')
+                .replace(/Policy Trace\s*[—\-]\s*/g, '')
+                .replace(/No\s+Yes/g, '')
+                .replace(/issue_root_token.*execute\s*✓/g, '')
+                .replace(/\n{2,}/g, '\n')
+                .trim();
+
+            if (cleanContent && cleanContent.length > 0) {
+                var lines = cleanContent.split('\n').filter(function(l) { return l.trim().length > 0; });
+                for (var li = 0; li < lines.length; li++) {
+                    var line = lines[li].trim();
+                    if (line.indexOf('❌') >= 0 || line.indexOf('🚫') >= 0) {
+                        botHtml += '<div style="font-size:0.72rem;color:#ef4444;margin-bottom:3px">' + line + '</div>';
+                    } else if (line.indexOf('✅') >= 0) {
+                        botHtml += '<div style="font-size:0.72rem;color:#34d399;margin-bottom:3px">' + line + '</div>';
+                    } else if (line.indexOf('⚠️') >= 0) {
+                        botHtml += '<div style="font-size:0.72rem;color:#fbbf24;margin-bottom:3px">' + line + '</div>';
+                    } else {
+                        botHtml += '<div style="font-size:0.72rem;color:rgba(255,255,255,0.6);margin-bottom:3px">' + line + '</div>';
+                    }
+                }
+            }
+
+            if (chain.length > 0) {
+                botHtml += '<div style="font-size:0.62rem;color:rgba(255,255,255,0.3);margin-top:6px;padding-top:4px;border-top:1px solid rgba(255,255,255,0.04);font-family:monospace">';
+                botHtml += chain.join(' → ');
+                if (result.blocked_at) botHtml += ' <span style="color:#ef4444">BLOCKED@' + result.blocked_at + '</span>';
+                botHtml += '</div>';
+            }
+
+            if (result.trust_score != null) {
+                botHtml += '<div style="font-size:0.62rem;color:rgba(255,255,255,0.3);margin-top:2px">Trust: <span style="color:' + (result.trust_score >= 0.7 ? '#34d399' : (result.trust_score >= 0.5 ? '#fbbf24' : '#ef4444')) + ';font-weight:700">' + result.trust_score.toFixed(2) + '</span></div>';
+            }
+
+            botHtml += '</div>';
+            addChatMsg('bot', botHtml, result);
             updateChain(chain, status);
 
             if (result.alignment && result.alignment.checked) {
