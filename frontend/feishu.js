@@ -1,4 +1,4 @@
-﻿﻿var FS = (function() {
+﻿﻿﻿﻿﻿var FS = (function() {
     var BASE = '/api/feishu';
     var DELEGATE_BASE = '/api/delegate';
     var GOV_BASE = '/api/governance';
@@ -530,6 +530,8 @@
                 html += '<div style="border-top:1px solid rgba(255,255,255,0.08);padding-top:6px;margin-top:6px;font-size:0.68rem;color:#34d399">👉 飞书机器人已就绪，可在飞书群 @机器人 发消息测试</div>';
             }
             addChatMsg('bot', html, { status: 'success' });
+        } else if (isAuto) {
+            addChatMsg('bot', '<div style="font-size:0.72rem;color:rgba(255,255,255,0.4)">本地 Mock 模式 — 点击上方按钮可直接演示</div>', { status: 'info' });
         }
 
         if (btn) {
@@ -578,6 +580,17 @@
 
                 if (ngrokUrl && connected) {
                     _onConnected(ngrokUrl, data.webhook_url, connected, isAuto);
+                } else if (isAuto) {
+                    _onConnected(ngrokUrl || '', data.webhook_url || '', false, true);
+                    var modeEl = document.getElementById('statMode');
+                    if (modeEl) { modeEl.textContent = 'MOCK'; modeEl.style.color = '#fbbf24'; }
+                    if (btn) {
+                        btn.textContent = '🚀 连接';
+                        btn.disabled = false;
+                        btn.style.background = '';
+                        btn.style.color = '';
+                        btn.style.border = '';
+                    }
                 } else if (!isAuto && !connected) {
                     if (btn) {
                         btn.textContent = '🚀 启动公网连接';
@@ -586,14 +599,7 @@
                         btn.style.color = '';
                         btn.style.border = '';
                     }
-                } else if (isAuto && !connected) {
-                    if (btn) {
-                        btn.textContent = '🚀 启动公网连接';
-                        btn.disabled = false;
-                        btn.style.background = '';
-                        btn.style.color = '';
-                        btn.style.border = '';
-                    }
+                }
                 }
             })
             .catch(function(err) {
