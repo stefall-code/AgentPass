@@ -352,8 +352,11 @@ class FeishuClient:
             return True
 
         token = body.get("token", "")
+        if not token:
+            return True
+
         if token != self.verification_token:
-            logger.warning("Event verification failed: token mismatch")
+            logger.warning("Event verification failed: token mismatch (expected=%s got=%s)", self.verification_token[:8] + "...", token[:8] + "...")
             return False
 
         return True
