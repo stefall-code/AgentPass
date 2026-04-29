@@ -2,6 +2,99 @@
 
 All notable changes to AgentPass are documented here.
 
+## \[2.5.0] — 2026-04-30
+
+### 🏆 评委级展示体系重构 — 从"能做出来"到"可信地很强"
+
+本次更新聚焦于竞赛评委视角的展示优化，核心目标：让评委3秒内看到"这个系统是真的"。
+
+#### 叙事驱动页面结构
+
+- **3个主入口按钮**（替换原来的12个平铺按钮）：
+  - 🔥 **为什么需要 AgentPass** — 三句话杀手页（问题→方案→创新）
+  - ⚔️ **运行真实攻击测试** — 压倒性瞬间（脉冲动画按钮）
+  - 🔍 **可验证性证明** — 评委验证
+- 辅助按钮（四步演示/核心创新/四级撤销/OWASP/P2/OAuth/MCP-A2A/凭证经纪人/对齐检查）降级为 ghost 样式
+
+#### 三句话杀手锏
+
+1. Agent 身份不可验证 → A2A Token + 签名信任链
+2. 权限会被绕过 → 能力约束 + 动态收缩
+3. AI 会被攻击 → 把 Prompt 风险写入 IAM
+
+核心流程：`Prompt → Risk → Trust → Capability → Decision`
+
+#### 对抗式视觉证据
+
+- **证据从"列表"改为"对抗流程"**：
+  ```
+  [ATTACK] No Token
+      ↓
+  [IAM CHECK]
+      ↓
+  [RESULT] 拒绝
+  ```
+- 每种攻击类型有独立中间层标签（IAM CHECK / SIGNATURE VERIFY / RISK→TRUST→CAPABILITY）
+- 每条攻击标注 `来源: /api/xxx (真实后端)` — 证明不是前端动画
+- 每条结果标注 `(403)` — HTTP 状态码，不是模拟
+
+#### 压倒性瞬间 — 运行真实攻击测试
+
+- 按钮文案：`⚔️ 运行真实攻击测试` + 小字 `调用后端 API，非前端模拟`
+- 3种攻击实时执行：External Agent / Forged Token / Prompt Injection
+- 每次攻击实时显示后端 API 来源 + BLOCKED 结果
+- 毫秒级审计日志连续打印（`[04:39:52.182] external_agent → data_agent → DENY (312ms)`）
+- 收尾一击：`攻击会改变权限结构` + 传统 IAM vs AgentPass 对比锚点
+
+#### 结论卡片 + 可复现入口
+
+- 3张结论卡片：外部攻击不可绕过(最硬) / 信任链不可伪造(架构级) / Prompt注入改变权限(核心创新)
+- 每张卡片底部：`[运行测试] scripts/attack_bypass_test.py` / `[查看验证] /api/p2/judge/verify-all`
+- 评委看到"这不是展示，是可以验证的"
+
+#### 对比锚点
+
+- 传统 IAM：`Request → Permission → Allow/Deny`（请求是静态的）
+- AgentPass：`Prompt → Risk → Trust → Capability → Decision`（请求本身会改变权限）
+- 差异总结：`差异不是"流程更多"，而是"权限由行为动态决定"`
+
+#### 系统边界声明（工程声明）
+
+- 适用：多 Agent 委派调用链 / 所有请求经过 IAM Gateway / 使用签名委派 Token（逐跳验证）
+- 不覆盖：单 Agent 本地执行（无身份传播）/ Agent 内部逻辑漏洞（非身份问题）/ 非 Token 通道调用（绕过接入层）
+- 结论：`本系统保证"身份与权限不可被外部绕过"，不保证"业务逻辑绝对安全"`
+- 验证：`该边界可通过攻击测试脚本复现验证`
+
+#### 指标精简 — 只保留3个最硬指标
+
+- ❌ 删除：`7/7 PROVEN`、`10/10 OWASP`、`87.5% 兼容`、`<50ms 延迟(4个metrics)`
+- ✅ 保留：外部攻击不可绕过 / 信任链不可伪造 / Prompt→权限变化
+- 辅助信息降级为一行横排标签，不允许展开
+
+#### 表达克制化
+
+- `87.5%` → `7/8 fields aligned with industry standards`
+- `7/7 PROVEN` → `核心声明全部有证据支撑`
+- `fully implemented and running` → `core pipeline implemented`
+- 删除"不是检测攻击/而是"等铺垫语
+- 删除 q4 架构行、key_statement_cn 重复展示
+- 辅助验证项从4行详情 → 一行横排短名
+
+### 后端改动
+
+- **`app/security/standard_hitl.py`** — KILLER_SUMMARY 重构为 three_core_claims 结构（含 evidence_items）；删除 chain_integrity/adversarial_agent/performance 独立区块；新增 supplementary 区块；兼容率从 `87.5%` 改为 `7/8 fields aligned`
+- **`app/security/judge_verify.py`** — summary 从 `proven/total` 改为 `core_claims/core_claims_cn/all_core_proven`；verify_honest_capability_framing 表达克制化
+- **`scripts/attack_bypass_test.py`** — 新增 Test [7] Chain tampering（MITM on delegation chain）
+
+### 前端改动
+
+- **`frontend/feishu.html`** — 按钮布局重构为3主入口+辅助；新增 fsAttackPulse 动画
+- **`frontend/feishu.js`** — runKillerSummary 重写（对抗流程+结论卡片+边界声明+对比锚点）；runAttackDemo 新增（实时攻击+毫秒日志+收尾一击）；runJudgeVerify 重写（3核心声明+辅助验证项简化）
+
+### 版本号更新
+
+- 全量 `v2.4` → `v2.5`（main.py 4处 / 前端 HTML 8处 / v22.js / platforms.py / README.md）
+
 ## \[2.4.1] — 2026-04-27
 
 ### 🔗 链路打通修复 — 飞书请求完整进入 IAM 审计体系
