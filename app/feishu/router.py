@@ -1,4 +1,5 @@
-import json
+﻿import json
+import os
 import logging
 import asyncio
 from typing import Dict, Any, Optional
@@ -202,7 +203,7 @@ async def feishu_status():
 @router.post("/connect")
 async def feishu_connect():
     import subprocess
-    import httpx
+    import httpx as sync_httpx
 
     from main import _ngrok_url
 
@@ -227,9 +228,8 @@ async def feishu_connect():
 
             for _ in range(10):
                 try:
-                    resp = await asyncio.get_event_loop().run_in_executor(
-                        None,
-                        lambda: httpx.get("http://127.0.0.1:4040/api/tunnels", timeout=3),
+                    resp = await asyncio.to_thread(
+                        sync_httpx.get, "http://127.0.0.1:4040/api/tunnels", timeout=3
                     )
                     data = resp.json()
                     for t in data.get("tunnels", []):
