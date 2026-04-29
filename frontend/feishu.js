@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿var FS = (function() {
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿var FS = (function() {
     var BASE = '/api/feishu';
     var DELEGATE_BASE = '/api/delegate';
     var GOV_BASE = '/api/governance';
@@ -567,38 +567,26 @@
             .then(function(data) {
                 var ngrokUrl = data.ngrok_url || '';
                 var connected = data.connected;
-                var tokenOk = data.token_ok;
-                var ngrokStarted = data.ngrok_started;
 
-                if (ngrokUrl) {
-                    _onConnected(ngrokUrl, data.webhook_url, connected, true);
+                if (connected && ngrokUrl) {
+                    _onConnected(ngrokUrl, data.webhook_url, true, true);
                 } else {
-                    _onConnected('', '', false, true);
                     var modeEl = document.getElementById('statMode');
-                    if (modeEl) {
-                        modeEl.textContent = connected ? 'PROD' : 'MOCK';
-                        modeEl.style.color = connected ? '#34d399' : '#fbbf24';
-                    }
+                    if (modeEl) { modeEl.textContent = 'MOCK'; modeEl.style.color = '#fbbf24'; }
                     if (btn) {
-                        btn.textContent = '✅ 已连接';
-                        btn.style.background = 'rgba(52,211,153,0.12)';
-                        btn.style.color = '#059669';
-                        btn.style.border = '1px solid rgba(52,211,153,0.3)';
+                        btn.textContent = '🟡 Mock 模式';
                         btn.disabled = false;
                     }
+                    addChatMsg('bot', '<div style="font-size:0.72rem;color:#8e8e93">本地 Mock 模式 — 所有演示功能可直接使用</div>', { status: 'info' });
                     _autoConnected = true;
                 }
             })
             .catch(function() {
-                _onConnected('', '', false, true);
                 var modeEl = document.getElementById('statMode');
                 if (modeEl) { modeEl.textContent = 'MOCK'; modeEl.style.color = '#fbbf24'; }
                 if (btn) {
-                    btn.textContent = '🚀 重新连接';
+                    btn.textContent = '🚀 连接飞书';
                     btn.disabled = false;
-                    btn.style.background = '';
-                    btn.style.color = '';
-                    btn.style.border = '';
                 }
             });
     }
@@ -615,22 +603,17 @@
                 html += '<div style="border-top:1px solid rgba(0,0,0,0.08);padding-top:6px;margin-top:6px;font-size:0.68rem;color:#34d399">👉 飞书机器人已就绪，可在飞书群 @机器人 发消息测试</div>';
             }
             addChatMsg('bot', html, { status: 'success' });
-        } else if (isAuto) {
-            addChatMsg('bot', '<div style="font-size:0.72rem;color:#8e8e93">本地 Mock 模式 — 点击上方按钮可直接演示</div>', { status: 'info' });
         }
 
-        if (btn) {
+        if (btn && isProd) {
             btn.textContent = '✅ 已连接';
-            btn.style.background = 'rgba(52,211,153,0.15)';
-            btn.style.color = '#34d399';
+            btn.style.background = 'rgba(52,211,153,0.12)';
+            btn.style.color = '#059669';
             btn.style.border = '1px solid rgba(52,211,153,0.3)';
         }
         if (modeEl && isProd) {
             modeEl.textContent = 'PROD';
             modeEl.style.color = '#34d399';
-        } else if (modeEl) {
-            modeEl.textContent = 'MOCK';
-            modeEl.style.color = '#fbbf24';
         }
         _autoConnected = true;
     }
@@ -645,21 +628,15 @@
                 var connected = data.connected;
                 var ngrokUrl = data.ngrok_url || '';
                 var tokenOk = data.token_ok;
-                var ngrokStarted = data.ngrok_started;
-                var isMock = !connected && !ngrokUrl;
 
-                if (!isAuto) {
-                    if (connected) {
-                        var html = '<div style="font-size:0.78rem;font-weight:700;color:#34d399;margin-bottom:8px">✅ 飞书公网连接已就绪</div>';
-                        html += '<div style="font-size:0.7rem;color:#3a3a3c;margin-bottom:4px">飞书 Token：<span style="color:#34d399">✅ 有效</span></div>';
-                        if (ngrokUrl) {
-                            html += '<div style="font-size:0.7rem;color:#3a3a3c;margin-bottom:4px">公网地址：<span style="color:#64d2ff">' + ngrokUrl + '</span></div>';
-                            html += '<div style="border-top:1px solid rgba(0,0,0,0.08);padding-top:6px;margin-top:6px;font-size:0.68rem;color:#636366">Webhook：' + data.webhook_url + '</div>';
-                        }
-                        html += '<div style="border-top:1px solid rgba(0,0,0,0.08);padding-top:6px;margin-top:6px;font-size:0.68rem;color:#34d399">👉 飞书机器人已就绪，可在飞书群 @机器人 发消息测试</div>';
-                        addChatMsg('bot', html, { status: 'success' });
-                    } else {
-                        var html = '<div style="font-size:0.78rem;font-weight:700;color:#34d399;margin-bottom:8px">✅ 后端已连接（Mock 模式）</div>';
+                if (connected) {
+                    _onConnected(ngrokUrl, data.webhook_url, true, isAuto);
+                } else {
+                    var modeEl = document.getElementById('statMode');
+                    if (modeEl) { modeEl.textContent = 'MOCK'; modeEl.style.color = '#fbbf24'; }
+
+                    if (!isAuto) {
+                        var html = '<div style="font-size:0.78rem;font-weight:700;color:#fbbf24;margin-bottom:8px">🟡 未连接飞书（Mock 模式）</div>';
                         html += '<div style="font-size:0.7rem;color:#3a3a3c;margin-bottom:4px">所有演示功能可直接使用</div>';
                         if (tokenOk) {
                             html += '<div style="font-size:0.7rem;color:#3a3a3c;margin-bottom:4px">飞书 Token：<span style="color:#34d399">✅ 有效</span></div>';
@@ -669,24 +646,14 @@
                         if (ngrokUrl) {
                             html += '<div style="font-size:0.7rem;color:#3a3a3c;margin-bottom:4px">公网地址：<span style="color:#64d2ff">' + ngrokUrl + '</span></div>';
                         }
-                        addChatMsg('bot', html, { status: 'success' });
+                        addChatMsg('bot', html, { status: 'info' });
                     }
-                }
 
-                if (ngrokUrl && connected) {
-                    _onConnected(ngrokUrl, data.webhook_url, connected, isAuto);
-                } else {
-                    _onConnected(ngrokUrl || '', data.webhook_url || '', false, isAuto);
-                    var modeEl = document.getElementById('statMode');
-                    if (modeEl) {
-                        modeEl.textContent = connected ? 'PROD' : 'MOCK';
-                        modeEl.style.color = connected ? '#34d399' : '#fbbf24';
-                    }
                     if (btn) {
-                        btn.textContent = '✅ 已连接';
-                        btn.style.background = 'rgba(52,211,153,0.12)';
-                        btn.style.color = '#059669';
-                        btn.style.border = '1px solid rgba(52,211,153,0.3)';
+                        btn.textContent = '🟡 Mock 模式';
+                        btn.style.background = '';
+                        btn.style.color = '';
+                        btn.style.border = '';
                         btn.disabled = false;
                     }
                     _autoConnected = true;
@@ -697,11 +664,11 @@
                     addChatMsg('bot', '<div style="color:#ef4444">❌ 连接失败: ' + err.message + '</div>', { status: 'denied' });
                 }
                 if (btn) {
-                    btn.textContent = '🚀 重新连接';
-                    btn.disabled = false;
+                    btn.textContent = '🚀 连接飞书';
                     btn.style.background = '';
                     btn.style.color = '';
                     btn.style.border = '';
+                    btn.disabled = false;
                 }
             });
     }
