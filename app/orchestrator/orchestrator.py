@@ -162,6 +162,7 @@ def _execute_data_agent(action: str) -> Dict[str, Any]:
         table_id = settings.BITABLE_SALES_TABLE_ID
 
     real_data = None
+    real_records = []
     if app_token and table_id:
         try:
             from app.feishu.client import get_feishu_client
@@ -171,24 +172,26 @@ def _execute_data_agent(action: str) -> Dict[str, Any]:
                 if result.get("code") == 0:
                     items = result.get("data", {}).get("items", [])
                     if items:
-                        first_record = items[0].get("fields", {})
-                        real_data = {}
-                        for k, v in first_record.items():
-                            if isinstance(v, dict) and "text" in v:
-                                real_data[k] = v["text"]
-                            elif isinstance(v, dict) and "link" in v:
-                                real_data[k] = v["link"]
-                            elif isinstance(v, list):
-                                texts = []
-                                for item in v:
-                                    if isinstance(item, dict) and "text" in item:
-                                        texts.append(item["text"])
-                                    else:
-                                        texts.append(str(item))
-                                real_data[k] = ", ".join(texts) if texts else str(v)
-                            else:
-                                real_data[k] = str(v)
-                        logger.info("Bitable real data fetched: %d fields from %s", len(real_data), title)
+                        for record in items:
+                            fields = record.get("fields", {})
+                            row = {}
+                            for k, v in fields.items():
+                                if isinstance(v, dict) and "text" in v:
+                                    row[k] = v["text"]
+                                elif isinstance(v, dict) and "link" in v:
+                                    row[k] = v["link"]
+                                elif isinstance(v, list):
+                                    texts = []
+                                    for item in v:
+                                        if isinstance(item, dict) and "text" in item:
+                                            texts.append(item["text"])
+                                        else:
+                                            texts.append(str(item))
+                                    row[k] = ", ".join(texts) if texts else str(v)
+                                else:
+                                    row[k] = str(v)
+                            real_records.append(row)
+                        logger.info("Bitable real data fetched: %d records from %s", len(real_records), title)
                     else:
                         logger.warning("Bitable returned 0 records for %s", title)
                 else:
@@ -196,12 +199,21 @@ def _execute_data_agent(action: str) -> Dict[str, Any]:
         except Exception as e:
             logger.error("Failed to fetch Bitable data for %s: %s", title, e)
 
-    data = real_data if real_data else mock_data
-    source = "飞书多维表格" if real_data else "Mock数据"
-
+    source = "飞书多维表格" if real_records else "Mock数据"
     content_lines = [f"📊 {title}查询结果（{source}）：\n"]
-    for k, v in data.items():
-        content_lines.append(f"  • {k}: {v}")
+
+    if real_records:
+        for i, row in enumerate(real_records, 1):
+            content_lines.append(f"  【记录 {i}】")
+            for k, v in row.items():
+                content_lines.append(f"    • {k}: {v}")
+            if i < len(real_records):
+                content_lines.append("")
+        data = real_records
+    else:
+        for k, v in mock_data.items():
+            content_lines.append(f"  • {k}: {v}")
+        data = mock_data
 
     return {"status": "success", "content": "\n".join(content_lines), "data": data, "agent": "data_agent", "action": action}
 
