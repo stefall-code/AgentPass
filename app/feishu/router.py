@@ -1,5 +1,6 @@
 ﻿import json
 import os
+import time
 import logging
 import asyncio
 from typing import Dict, Any, Optional
@@ -79,7 +80,22 @@ def _log_feishu_event(event_type: str, user_id: str, message: str, result: Dict[
         _feishu_event_log.pop(0)
 
 
-async def _process_feishu_message(user_id: str, message: str, chat_id: str = ""):
+_processed_messages: Dict[str, float] = {}
+_MESSAGE_TTL = 300
+
+
+async def _process_feishu_message(user_id: str, message: str, chat_id: str = "", message_id: str = ""):
+    global _processed_messages
+    now = time.time()
+    _processed_messages = {k: v for k, v in _processed_messages.items() if now - v < _MESSAGE_TTL}
+
+    if message_id and message_id in _processed_messages:
+        _logger.info("Skipping duplicate message: %s", message_id)
+        return {"status": "skipped", "content": "duplicate", "reason": "already processed"}
+
+    if message_id:
+        _processed_messages[message_id] = now
+
     client = get_feishu_client()
 
     try:
@@ -135,10 +151,11 @@ async def feishu_webhook(body: Dict[str, Any], background_tasks: BackgroundTasks
     user_id = parsed["user_id"]
     message = parsed["message"]
     chat_id = parsed.get("chat_id", "")
+    message_id = parsed.get("message_id", "")
 
     _logger.info("Feishu webhook: user=%s message='%s'", user_id, message[:50])
 
-    background_tasks.add_task(_process_feishu_message, user_id, message, chat_id)
+    background_tasks.add_task(_process_feishu_message, user_id, message, chat_id, message_id)
 
     return {"code": 0, "msg": "ok"}
 
