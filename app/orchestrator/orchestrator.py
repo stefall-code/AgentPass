@@ -298,6 +298,12 @@ def run_task(user_id: str = "", message: str = "", platform_request: PlatformReq
 
         if is_attack == "escalation":
             return _handle_escalation_attack(user_id, message, engine, target_action, platform)
+
+        if is_attack == "prompt_injection":
+            return _handle_prompt_injection(user_id, message, engine, platform)
+
+        if is_attack == "sensitive_doc":
+            return _handle_sensitive_doc(user_id, message, engine, target_action, platform)
     except Exception as e:
         logger.error("Attack handler error: %s", e, exc_info=True)
         return {"status": "error", "content": _format_denied(f"❌ 系统处理异常\n原因：{str(e)}", ["user:" + user_id], target_action), "reason": str(e), "chain": ["user:" + user_id], "capability": target_action, "trust_score": None, "platform": platform}
@@ -418,6 +424,71 @@ def _handle_replay_attack(user_id: str, message: str, engine: DelegationEngine, 
     return {"status": "success", "content": "⚠️ 重放攻击未被检测（Token 未被标记为已使用）", "chain": chain, "capability": "read:feishu_table", "trust_score": replay.get("trust_score"), "attack_type": "replay", "platform": platform, "platform_risk": platform_risk}
 
 
+def _handle_prompt_injection(user_id: str, message: str, engine: DelegationEngine, platform: str = "web") -> Dict[str, Any]:
+    chain = ["user:" + user_id, "doc_agent"]
+
+    root_token = engine.issue_root_token(
+        agent_id="doc_agent",
+        delegated_user=user_id,
+        capabilities=["read:doc", "write:doc:public", "delegate:data_agent"],
+        metadata={"platform": platform, "source": "webhook", "risk_context": {"prompt_injection_detected": True}},
+    )
+
+    check_result = engine.check(token=root_token, action="prompt:injection", caller_agent="doc_agent")
+
+    formatted = "🛡️ Prompt 注入检测\n\n"
+    formatted += "⚠️ 检测到提示词注入攻击\n"
+    formatted += f"📋 原始输入：{message[:80]}\n\n"
+    formatted += "🔍 分析：\n"
+    formatted += "  • 输入包含指令覆盖/角色切换关键词\n"
+    formatted += "  • Agent 身份不可被外部指令篡改\n"
+    formatted += "  • 能力约束不受 Prompt 影响\n\n"
+
+    if not check_result.allowed:
+        formatted += "❌ 注入攻击 → 已拦截\n"
+        formatted += f"🔐 原因：{check_result.reason}\n"
+        formatted += f"🏆 风险评分：{check_result.risk_score:.2f}\n"
+        _log_event(user_id, message, "doc_agent", "prompt:injection", "blocked", None, {"attack_type": "prompt_injection"}, platform=platform)
+        return {"status": "denied", "content": formatted, "chain": chain, "capability": "prompt:injection", "trust_score": None, "attack_type": "prompt_injection", "platform": platform}
+
+    formatted += "⚠️ 注入攻击已识别，但系统未拦截（能力检查未覆盖 prompt:injection）\n"
+    _log_event(user_id, message, "doc_agent", "prompt:injection", "detected", None, {"attack_type": "prompt_injection"}, platform=platform)
+    return {"status": "denied", "content": formatted, "chain": chain, "capability": "prompt:injection", "trust_score": None, "attack_type": "prompt_injection", "platform": platform}
+
+
+def _handle_sensitive_doc(user_id: str, message: str, engine: DelegationEngine, target_action: str, platform: str = "web") -> Dict[str, Any]:
+    chain = ["user:" + user_id, "doc_agent"]
+
+    root_token = engine.issue_root_token(
+        agent_id="doc_agent",
+        delegated_user=user_id,
+        capabilities=["read:doc", "write:doc:public", "delegate:data_agent"],
+        metadata={"platform": platform, "source": "webhook", "risk_context": {"sensitive_doc_requested": True}},
+    )
+
+    check_result = engine.check(token=root_token, action=target_action, caller_agent="doc_agent")
+
+    formatted = "🔒 敏感文档访问控制\n\n"
+    formatted += f"📋 请求：{message[:80]}\n"
+    formatted += f"🔐 请求能力：{target_action}\n\n"
+
+    if not check_result.allowed:
+        formatted += "❌ 访问被拒绝\n"
+        formatted += f"🔐 原因：{check_result.reason}\n"
+        formatted += f"🏆 风险评分：{check_result.risk_score:.2f}\n"
+        formatted += "\n💡 Agent 只具备以下能力：\n"
+        formatted += "  • read:doc — 读取普通文档\n"
+        formatted += "  • write:doc:public — 写入公开文档\n"
+        formatted += "  • delegate:data_agent — 委派数据查询\n"
+        formatted += "\n❌ 不具备：read:doc:confidential — 读取机密文档\n"
+        _log_event(user_id, message, "doc_agent", target_action, "denied", None, {"attack_type": "sensitive_doc"}, platform=platform)
+        return {"status": "denied", "content": formatted, "chain": chain, "capability": target_action, "trust_score": None, "attack_type": "sensitive_doc", "platform": platform}
+
+    formatted += "⚠️ 敏感文档访问未被拦截（能力检查未覆盖）\n"
+    _log_event(user_id, message, "doc_agent", target_action, "allowed", None, {"attack_type": "sensitive_doc"}, platform=platform)
+    return {"status": "denied", "content": formatted, "chain": chain, "capability": target_action, "trust_score": None, "attack_type": "sensitive_doc", "platform": platform}
+
+
 def _handle_auto_revoke_attack(user_id: str, message: str, engine: DelegationEngine, platform: str = "web") -> Dict[str, Any]:
     root_token = engine.issue_root_token(agent_id="external_agent", delegated_user=user_id, capabilities=["write:doc:public"])
 
@@ -478,6 +549,23 @@ def _parse_intent(message: str) -> tuple:
 
     if any(kw in msg for kw in ["连续测试", "连续攻击", "auto.revoke", "auto revoke", "暴力"]):
         return "auto_revoke_attack", "write:doc:public", "external_agent", "auto_revoke"
+
+    if any(kw in msg for kw in [
+        "忽略之前", "忽略指令", "ignore previous", "ignore instructions",
+        "你现在是", "假装你是", "pretend you are", "act as",
+        "绕过", "bypass", "越权", "escalate",
+        "给我管理员", "give me admin", "提升权限", "privilege",
+        "系统提示", "system prompt", "原始指令", "original instructions",
+        "jailbreak", "越狱", "注入", "inject",
+    ]):
+        return "prompt_injection", "prompt:injection", "doc_agent", "prompt_injection"
+
+    if any(kw in msg for kw in [
+        "机密文档", "机密文件", "confidential", "classified",
+        "admin_playbook", "secret", "internal only",
+        "敏感文档", "敏感文件", "绝密", "top secret",
+    ]):
+        return "sensitive_doc", "read:doc:confidential", "doc_agent", "escalation"
 
     if any(kw in msg for kw in ["薪资", "salary", "工资"]):
         return "escalation", "read:feishu_table:salary", "data_agent", "escalation"
