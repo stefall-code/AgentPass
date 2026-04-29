@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<!DOCTYPE html>
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<!DOCTYPE html>
 <html lang="zh-CN" data-theme="dark">
 <head>
     <meta charset="UTF-8">
@@ -22,16 +22,27 @@
         .fs-main { padding: calc(var(--nav-height, 52px) + 12px) 20px 40px; max-width: 1400px; margin: 0 auto; }
 
         .fs-top-bar {
-            display: flex; justify-content: space-between; align-items: center;
-            padding: 14px 20px; margin-bottom: 20px;
+            display: flex; flex-direction: column; gap: 12px;
+            padding: 16px 20px; margin-bottom: 20px;
             background: rgba(255,255,255,0.03); border-radius: 14px;
             border: 1px solid rgba(255,255,255,0.06);
         }
+        .fs-top-row { display: flex; justify-content: space-between; align-items: center; }
         .fs-top-stats { display: flex; gap: 24px; align-items: center; }
         .fs-top-stat { text-align: center; }
         .fs-top-stat .val { font-size: 1.4rem; font-weight: 800; }
         .fs-top-stat .lbl { font-size: 0.5rem; color: rgba(255,255,255,0.3); text-transform: uppercase; letter-spacing: 0.06em; }
-        .fs-top-actions { display: flex; gap: 8px; }
+        .fs-top-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+        .fs-actions-primary { display: flex; gap: 10px; }
+        .fs-actions-divider { width: 1px; height: 28px; background: rgba(255,255,255,0.08); margin: 0 4px; align-self: center; }
+        .fs-actions-secondary { display: flex; gap: 6px; flex-wrap: wrap; }
+        .fs-actions-toggle { display: none; padding: 6px 12px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.08); background: rgba(255,255,255,0.03); color: rgba(255,255,255,0.4); font-size: 0.7rem; cursor: pointer; }
+        .fs-actions-toggle:hover { background: rgba(255,255,255,0.06); }
+        @media (max-width: 1200px) {
+            .fs-actions-secondary { display: none; }
+            .fs-actions-secondary.open { display: flex; position: absolute; top: 100%; right: 0; background: rgba(28,28,30,0.95); backdrop-filter: blur(16px); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; padding: 10px; z-index: 100; flex-wrap: wrap; gap: 6px; }
+            .fs-actions-toggle { display: inline-flex; }
+        }
 
         .fs-btn {
             padding: 8px 16px; border-radius: 8px; border: none;
@@ -233,33 +244,43 @@
 
     <div class="fs-main">
         <div class="fs-top-bar">
-            <div class="fs-top-stats">
-                <div class="fs-top-stat"><div class="val" style="color:#f5f5f7" id="statEvents">0</div><div class="lbl">Events</div></div>
-                <div class="fs-top-stat"><div class="val" style="color:#34d399" id="statSuccess">0</div><div class="lbl">✅ Success</div></div>
-                <div class="fs-top-stat"><div class="val" style="color:#ef4444" id="statDenied">0</div><div class="lbl">❌ Denied</div></div>
-                <div style="width:1px;height:28px;background:rgba(255,255,255,0.06)"></div>
-                <div class="fs-top-stat">
-                    <div class="val fs-trust-anim" style="font-size:1rem" id="statTrust">0.92</div>
-                    <div class="lbl">Trust Score</div>
+            <div class="fs-top-row">
+                <div class="fs-top-stats">
+                    <div class="fs-top-stat"><div class="val" style="color:#f5f5f7" id="statEvents">0</div><div class="lbl">Events</div></div>
+                    <div class="fs-top-stat"><div class="val" style="color:#34d399" id="statSuccess">0</div><div class="lbl">✅ Success</div></div>
+                    <div class="fs-top-stat"><div class="val" style="color:#ef4444" id="statDenied">0</div><div class="lbl">❌ Denied</div></div>
+                    <div style="width:1px;height:28px;background:rgba(255,255,255,0.06)"></div>
+                    <div class="fs-top-stat">
+                        <div class="val fs-trust-anim" style="font-size:1rem" id="statTrust">0.92</div>
+                        <div class="lbl">Trust Score</div>
+                    </div>
+                    <div class="fs-top-stat"><div class="val" style="font-size:0.9rem" id="statMode">—</div><div class="lbl">Mode</div></div>
                 </div>
-                <div class="fs-top-stat"><div class="val" style="font-size:0.9rem" id="statMode">—</div><div class="lbl">Mode</div></div>
+                <div style="display:flex;gap:8px;align-items:center">
+                    <span style="font-size:0.6rem;color:rgba(255,255,255,0.25)">AgentPass v2.5</span>
+                    <button class="fs-btn fs-btn-ghost" onclick="FS.connectFeishu()" id="btnConnect" style="padding:6px 12px;font-size:0.7rem">🚀 连接</button>
+                    <button class="fs-btn fs-btn-ghost" onclick="FS.resetTrust()" id="btnReset" style="padding:6px 12px;font-size:0.7rem">🔄 重置</button>
+                </div>
             </div>
             <div class="fs-top-actions">
-                <button class="fs-btn" onclick="FS.runKillerSummary()" id="btnSummary" style="background:linear-gradient(135deg,#ef4444,#f97316);color:#fff;font-weight:800;font-size:0.88rem;padding:10px 20px;box-shadow:0 0 20px rgba(239,68,68,0.3)">🔥 为什么需要 AgentPass</button>
-                <button class="fs-btn" onclick="FS.runAttackDemo()" id="btnAttack" style="background:linear-gradient(135deg,#ef4444,#dc2626);color:#fff;font-weight:800;font-size:0.88rem;padding:10px 20px;box-shadow:0 0 20px rgba(239,68,68,0.4);animation:fsAttackPulse 2s ease infinite">⚔️ 运行真实攻击测试</button>
-                <button class="fs-btn" onclick="FS.runJudgeVerify()" id="btnJudge" style="background:linear-gradient(135deg,#06b6d4,#3b82f6);color:#fff;font-weight:700;font-size:0.85rem;padding:10px 18px">🔍 可验证性证明</button>
-                <div style="width:1px;height:32px;background:rgba(255,255,255,0.08)"></div>
-                <button class="fs-btn fs-btn-ghost" onclick="FS.run4StepDemo()" id="btnDemo">🎯 四步演示</button>
-                <button class="fs-btn fs-btn-ghost" onclick="FS.runCoreInnovationDemo()" id="btnCore">🔥 核心创新</button>
-                <button class="fs-btn fs-btn-ghost" onclick="FS.runRevocationDemo()" id="btnRevocation">🔐 四级撤销</button>
-                <button class="fs-btn fs-btn-ghost" onclick="FS.runOWASPDemo()" id="btnOWASP">🛡️ OWASP</button>
-                <button class="fs-btn fs-btn-ghost" onclick="FS.runP2Demo()" id="btnP2">⚙️ P2</button>
-                <button class="fs-btn fs-btn-ghost" onclick="FS.runOAuthDemo()" id="btnOAuth">🎫 OAuth</button>
-                <button class="fs-btn fs-btn-ghost" onclick="FS.runProtocolsDemo()" id="btnProtocols">🌐 MCP/A2A</button>
-                <button class="fs-btn fs-btn-ghost" onclick="FS.runBrokerDemo()" id="btnBroker">🔑 凭证经纪人</button>
-                <button class="fs-btn fs-btn-ghost" onclick="FS.runAlignmentDemo()" id="btnAlignment">🛡️ 对齐检查</button>
-                <button class="fs-btn fs-btn-ghost" onclick="FS.connectFeishu()" id="btnConnect">🚀 连接</button>
-                <button class="fs-btn fs-btn-ghost" onclick="FS.resetTrust()">🔄 重置</button>
+                <div class="fs-actions-primary">
+                    <button class="fs-btn" onclick="FS.runKillerSummary()" id="btnSummary" style="background:linear-gradient(135deg,#ef4444,#f97316);color:#fff;font-weight:800;font-size:0.85rem;padding:9px 18px;box-shadow:0 0 16px rgba(239,68,68,0.25)">🔥 为什么需要 AgentPass</button>
+                    <button class="fs-btn" onclick="FS.runAttackDemo()" id="btnAttack" style="background:linear-gradient(135deg,#ef4444,#dc2626);color:#fff;font-weight:800;font-size:0.85rem;padding:9px 18px;box-shadow:0 0 16px rgba(239,68,68,0.3);animation:fsAttackPulse 2s ease infinite">⚔️ 运行真实攻击测试</button>
+                    <button class="fs-btn" onclick="FS.runJudgeVerify()" id="btnJudge" style="background:linear-gradient(135deg,#06b6d4,#3b82f6);color:#fff;font-weight:700;font-size:0.82rem;padding:9px 16px">🔍 可验证性证明</button>
+                </div>
+                <div class="fs-actions-divider"></div>
+                <div class="fs-actions-secondary" id="secondaryActions">
+                    <button class="fs-btn fs-btn-ghost" onclick="FS.run4StepDemo()" id="btnDemo">🎯 四步演示</button>
+                    <button class="fs-btn fs-btn-ghost" onclick="FS.runCoreInnovationDemo()" id="btnCore">🔥 核心创新</button>
+                    <button class="fs-btn fs-btn-ghost" onclick="FS.runRevocationDemo()" id="btnRevocation">🔐 撤销</button>
+                    <button class="fs-btn fs-btn-ghost" onclick="FS.runOWASPDemo()" id="btnOWASP">🛡️ OWASP</button>
+                    <button class="fs-btn fs-btn-ghost" onclick="FS.runP2Demo()" id="btnP2">⚙️ P2</button>
+                    <button class="fs-btn fs-btn-ghost" onclick="FS.runOAuthDemo()" id="btnOAuth">🎫 OAuth</button>
+                    <button class="fs-btn fs-btn-ghost" onclick="FS.runProtocolsDemo()" id="btnProtocols">🌐 MCP</button>
+                    <button class="fs-btn fs-btn-ghost" onclick="FS.runBrokerDemo()" id="btnBroker">🔑 凭证</button>
+                    <button class="fs-btn fs-btn-ghost" onclick="FS.runAlignmentDemo()" id="btnAlignment">🛡️ 对齐</button>
+                </div>
+                <button class="fs-actions-toggle" id="btnMoreActions" onclick="document.getElementById('secondaryActions').classList.toggle('open')">更多 ▾</button>
             </div>
         </div>
 
