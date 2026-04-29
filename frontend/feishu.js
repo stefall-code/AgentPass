@@ -1,4 +1,4 @@
-﻿var FS = (function() {
+﻿﻿var FS = (function() {
     var BASE = '/api/feishu';
     var DELEGATE_BASE = '/api/delegate';
     var GOV_BASE = '/api/governance';
@@ -102,7 +102,7 @@
                     + '<div style="font-size:0.7rem;color:rgba(255,255,255,0.7);margin-bottom:4px">所有 Token 已失效</div>'
                     + '<div style="border-top:1px solid rgba(255,255,255,0.08);padding-top:6px;font-size:0.7rem;color:rgba(255,255,255,0.7)">Trust: ' + (resultData.trust_score_before != null ? resultData.trust_score_before.toFixed(2) : '—') + ' ↓ <span style="color:#ef4444;font-weight:700">0.00</span></div>';
             } else {
-                bubble.textContent = content;
+                bubble.innerHTML = content;
             }
             bubble.onclick = function() {
                 var expand = div.querySelector('.fs-msg-expand');
