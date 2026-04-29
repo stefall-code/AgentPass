@@ -3,6 +3,7 @@ import time
 from typing import Dict, Any, Optional, List, Union
 from app.delegation.engine import DelegationEngine, get_trust_score
 from app.platform import PlatformRequest, calculate_platform_risk
+from app.config import settings
 
 _engine_instance: Optional[DelegationEngine] = None
 
@@ -145,16 +146,60 @@ def _execute_agent(agent_id: str, action: str) -> Dict[str, Any]:
 
 def _execute_data_agent(action: str) -> Dict[str, Any]:
     if "finance" in action:
-        data = MOCK_DATA["finance"]
+        mock_data = MOCK_DATA["finance"]
         title = "财务数据"
+        app_token = settings.BITABLE_FINANCE_APP_TOKEN
+        table_id = settings.BITABLE_FINANCE_TABLE_ID
     elif "hr" in action:
-        data = MOCK_DATA["hr"]
+        mock_data = MOCK_DATA["hr"]
         title = "HR数据"
+        app_token = settings.BITABLE_HR_APP_TOKEN
+        table_id = settings.BITABLE_HR_TABLE_ID
     else:
-        data = MOCK_DATA["sales"]
+        mock_data = MOCK_DATA["sales"]
         title = "销售数据"
+        app_token = settings.BITABLE_SALES_APP_TOKEN
+        table_id = settings.BITABLE_SALES_TABLE_ID
 
-    content_lines = [f"📊 {title}查询结果：\n"]
+    real_data = None
+    if app_token and table_id:
+        try:
+            from app.feishu.client import get_feishu_client
+            client = get_feishu_client()
+            if client.is_configured():
+                result = client.get_bitable_records(app_token, table_id)
+                if result.get("code") == 0:
+                    items = result.get("data", {}).get("items", [])
+                    if items:
+                        first_record = items[0].get("fields", {})
+                        real_data = {}
+                        for k, v in first_record.items():
+                            if isinstance(v, dict) and "text" in v:
+                                real_data[k] = v["text"]
+                            elif isinstance(v, dict) and "link" in v:
+                                real_data[k] = v["link"]
+                            elif isinstance(v, list):
+                                texts = []
+                                for item in v:
+                                    if isinstance(item, dict) and "text" in item:
+                                        texts.append(item["text"])
+                                    else:
+                                        texts.append(str(item))
+                                real_data[k] = ", ".join(texts) if texts else str(v)
+                            else:
+                                real_data[k] = str(v)
+                        logger.info("Bitable real data fetched: %d fields from %s", len(real_data), title)
+                    else:
+                        logger.warning("Bitable returned 0 records for %s", title)
+                else:
+                    logger.warning("Bitable API error for %s: %s", title, result.get("msg", "unknown"))
+        except Exception as e:
+            logger.error("Failed to fetch Bitable data for %s: %s", title, e)
+
+    data = real_data if real_data else mock_data
+    source = "飞书多维表格" if real_data else "Mock数据"
+
+    content_lines = [f"📊 {title}查询结果（{source}）：\n"]
     for k, v in data.items():
         content_lines.append(f"  • {k}: {v}")
 
