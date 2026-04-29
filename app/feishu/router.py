@@ -1,4 +1,4 @@
-﻿import json
+﻿﻿﻿import json
 import logging
 import asyncio
 from typing import Dict, Any, Optional
@@ -90,12 +90,12 @@ async def _process_feishu_message(user_id: str, message: str, chat_id: str = "")
 
         if result.get("status") == "success" and result.get("data"):
             if chat_id:
-                await client.send_message(chat_id, reply_content)
+                await client.send_message(chat_id, reply_content, receive_id_type="chat_id")
             else:
                 await client.send_message(user_id, reply_content)
         else:
             if chat_id:
-                await client.send_message(chat_id, reply_content)
+                await client.send_message(chat_id, reply_content, receive_id_type="chat_id")
             else:
                 await client.send_message(user_id, reply_content)
 
@@ -107,7 +107,7 @@ async def _process_feishu_message(user_id: str, message: str, chat_id: str = "")
         error_msg = f"❌ 系统处理异常\n原因：{str(e)}"
         try:
             if chat_id:
-                await client.send_message(chat_id, error_msg)
+                await client.send_message(chat_id, error_msg, receive_id_type="chat_id")
             else:
                 await client.send_message(user_id, error_msg)
         except Exception:
