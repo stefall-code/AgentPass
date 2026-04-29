@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿var FS = (function() {
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿var FS = (function() {
     var BASE = '/api/feishu';
     var DELEGATE_BASE = '/api/delegate';
     var GOV_BASE = '/api/governance';
@@ -734,7 +734,7 @@
         var btn = document.getElementById('btnAlignment');
         if (btn) { btn.disabled = true; btn.textContent = '⏳ 检查中...'; }
         addChatMsg('user', '🛡️ 执行输出对齐检查演示');
-        fetchJSON(BASE + '/alignment/demo', { method: 'POST' })
+        fetchJSON('/api/alignment/demo', { method: 'POST' })
             .then(function(data) {
                 var results = data.results || [];
                 for (var i = 0; i < results.length; i++) {
