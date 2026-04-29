@@ -1,4 +1,4 @@
-﻿var IAM_EXPLAIN = (function() {
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿var IAM_EXPLAIN = (function() {
 
     var styleInjected = false;
 
@@ -17,17 +17,17 @@
             '.iam-explain-btn-lg{padding:8px 20px;font-size:0.82rem;border-radius:10px}',
             '.iam-explain-btn-sm{padding:3px 8px;font-size:0.6rem;border-radius:5px;gap:3px;animation:none}',
             '.iam-explain-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.75);z-index:10000;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(6px);animation:iamExpIn 0.3s ease}',
-            '.iam-explain-modal{background:linear-gradient(180deg,#1a1a2e 0%,#16162a 100%);border:1px solid rgba(139,92,246,0.2);border-radius:18px;width:92%;max-width:580px;max-height:82vh;overflow-y:auto;padding:0;box-shadow:0 24px 80px rgba(0,0,0,0.6),0 0 40px rgba(139,92,246,0.1)}',
+            '.iam-explain-modal{background:linear-gradient(180deg,#ffffff 0%,#f5f5f7 100%);border:1px solid rgba(139,92,246,0.15);border-radius:18px;width:92%;max-width:580px;max-height:82vh;overflow-y:auto;padding:0;box-shadow:0 24px 80px rgba(0,0,0,0.15),0 0 40px rgba(139,92,246,0.05)}',
             '.iam-explain-modal::-webkit-scrollbar{width:4px}',
             '.iam-explain-modal::-webkit-scrollbar-thumb{background:rgba(139,92,246,0.3);border-radius:2px}',
-            '.iam-explain-header{padding:20px 24px 16px;border-bottom:1px solid rgba(255,255,255,0.06)}',
+            '.iam-explain-header{padding:20px 24px 16px;border-bottom:1px solid rgba(0,0,0,0.06)}',
             '.iam-explain-body{padding:20px 24px 24px}',
             '.iam-explain-step{display:flex;gap:10px;align-items:flex-start;padding:10px 14px;margin-bottom:6px;border-radius:10px;opacity:0;animation:iamStepIn 0.35s ease forwards}',
             '.iam-explain-step-pass{background:rgba(52,211,153,0.06);border:1px solid rgba(52,211,153,0.12)}',
             '.iam-explain-step-fail{background:rgba(239,68,68,0.06);border:1px solid rgba(239,68,68,0.12)}',
-            '.iam-explain-section{margin-bottom:14px;padding:12px 14px;background:rgba(255,255,255,0.02);border-radius:10px;border:1px solid rgba(255,255,255,0.04)}',
+            '.iam-explain-section{margin-bottom:14px;padding:12px 14px;background:rgba(0,0,0,0.02);border-radius:10px;border:1px solid rgba(0,0,0,0.04)}',
             '.iam-explain-section-title{font-size:0.75rem;font-weight:700;margin-bottom:6px}',
-            '.iam-explain-section-body{font-size:0.7rem;color:rgba(255,255,255,0.55);line-height:1.6}',
+            '.iam-explain-section-body{font-size:0.7rem;color:#636366;line-height:1.6}',
         ].join('\n');
         document.head.appendChild(s);
     }
@@ -55,19 +55,19 @@
         html += '<div style="width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:1.2rem;background:' + headerBg + ';border:1px solid ' + headerBorder + '">' + summaryIcon + '</div>';
         html += '<div>';
         html += '<div style="font-size:1rem;font-weight:800;color:' + summaryColor + '">IAM 决策解释</div>';
-        html += '<div style="font-size:0.65rem;color:rgba(255,255,255,0.3)">Explainable IAM · Agent ' + (explanation.agent_id || '—') + '</div>';
+        html += '<div style="font-size:0.65rem;color:#8e8e93">Explainable IAM · Agent ' + (explanation.agent_id || '—') + '</div>';
         html += '</div></div>';
-        html += '<button onclick="document.getElementById(\'iamExplainOverlay\').remove()" style="width:32px;height:32px;border-radius:8px;background:rgba(255,255,255,0.05);border:1px solid rgba(255,255,255,0.08);color:rgba(255,255,255,0.4);font-size:1rem;cursor:pointer;display:flex;align-items:center;justify-content:center">✕</button>';
+        html += '<button onclick="document.getElementById(\'iamExplainOverlay\').remove()" style="width:32px;height:32px;border-radius:8px;background:rgba(0,0,0,0.04);border:1px solid rgba(0,0,0,0.08);color:#636366;font-size:1rem;cursor:pointer;display:flex;align-items:center;justify-content:center">✕</button>';
         html += '</div>';
 
         html += '<div style="margin-top:12px;padding:12px 14px;border-radius:10px;background:' + (isAllow ? 'rgba(52,211,153,0.08)' : (isAutoRevoked ? 'rgba(239,68,68,0.12)' : (isPromptBlocked ? 'rgba(167,139,250,0.08)' : 'rgba(239,68,68,0.08)'))) + ';border:1px solid ' + (isAllow ? 'rgba(52,211,153,0.2)' : (isAutoRevoked ? 'rgba(239,68,68,0.3)' : (isPromptBlocked ? 'rgba(167,139,250,0.2)' : 'rgba(239,68,68,0.2)'))) + '">';
         html += '<div style="font-size:0.85rem;font-weight:800;color:' + summaryColor + '">' + (explanation.summary || '') + '</div>';
-        html += '<div style="font-size:0.65rem;color:rgba(255,255,255,0.35);margin-top:4px">Action: ' + (explanation.action || '—') + '</div>';
+        html += '<div style="font-size:0.65rem;color:#8e8e93;margin-top:4px">Action: ' + (explanation.action || '—') + '</div>';
         html += '</div></div>';
 
         html += '<div class="iam-explain-body">';
 
-        html += '<div style="font-size:0.78rem;font-weight:700;color:rgba(255,255,255,0.6);margin-bottom:10px;display:flex;align-items:center;gap:6px"><span style="font-size:1rem">🔍</span> 决策步骤</div>';
+        html += '<div style="font-size:0.78rem;font-weight:700;color:#1d1d1f;margin-bottom:10px;display:flex;align-items:center;gap:6px"><span style="font-size:1rem">🔍</span> 决策步骤</div>';
         var steps = explanation.steps || [];
         steps.forEach(function(s, i) {
             var isPass = s.result === 'pass';
@@ -76,10 +76,10 @@
             html += '<span style="font-size:1rem;flex-shrink:0;line-height:1">' + (s.icon || (isPass ? '✔️' : '❌')) + '</span>';
             html += '<div style="flex:1;min-width:0">';
             html += '<div style="display:flex;justify-content:space-between;align-items:center">';
-            html += '<span style="font-size:0.76rem;font-weight:700;color:rgba(255,255,255,0.8)">' + s.step + '</span>';
+            html += '<span style="font-size:0.76rem;font-weight:700;color:#1d1d1f">' + s.step + '</span>';
             html += '<span style="font-size:0.6rem;padding:2px 8px;border-radius:6px;font-weight:700;background:' + (isPass ? 'rgba(52,211,153,0.15)' : 'rgba(239,68,68,0.15)') + ';color:' + (isPass ? '#34d399' : '#ef4444') + '">' + s.result.toUpperCase() + '</span>';
             html += '</div>';
-            html += '<div style="font-size:0.66rem;color:rgba(255,255,255,0.4);margin-top:3px;line-height:1.4">' + (s.detail || '') + '</div>';
+            html += '<div style="font-size:0.66rem;color:#636366;margin-top:3px;line-height:1.4">' + (s.detail || '') + '</div>';
             html += '</div></div>';
         });
 

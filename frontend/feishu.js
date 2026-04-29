@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿var FS = (function() {
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿var FS = (function() {
     var BASE = '/api/feishu';
     var DELEGATE_BASE = '/api/delegate';
     var GOV_BASE = '/api/governance';
@@ -89,22 +89,22 @@
                 var riskColor = resultData.prompt_risk_score > 0.7 ? '#ef4444' : (resultData.prompt_risk_score > 0.35 ? '#fbbf24' : '#34d399');
                 var sevColor = resultData.severity === 'critical' ? '#ef4444' : (resultData.severity === 'high' ? '#f87171' : '#fbbf24');
                 bubble.innerHTML = '<div style="font-size:0.78rem;font-weight:700;color:#f87171;margin-bottom:6px">🔥 Prompt Injection Detected</div>'
-                    + '<div style="font-size:0.7rem;color:rgba(255,255,255,0.7);margin-bottom:4px">风险分：<span style="color:' + riskColor + ';font-weight:700">' + (resultData.prompt_risk_score || 0).toFixed(2) + '</span>（' + (resultData.severity || '—') + '）</div>'
-                    + '<div style="font-size:0.7rem;color:rgba(255,255,255,0.7);margin-bottom:4px">攻击类型：<span style="color:#f87171">' + (resultData.attack_types || []).join(', ') + '</span></div>'
-                    + '<div style="border-top:1px solid rgba(255,255,255,0.08);padding-top:6px;font-size:0.7rem;color:rgba(255,255,255,0.7)">🛡️ IAM：直接拒绝</div>'
-                    + '<div style="font-size:0.65rem;color:rgba(255,255,255,0.4);margin-top:4px">Trust: ' + (resultData.trust_score_before != null ? resultData.trust_score_before.toFixed(2) : '—') + ' ↓ ' + (resultData.trust_score != null ? resultData.trust_score.toFixed(2) : '—') + '</div>';
+                    + '<div style="font-size:0.7rem;color:#3a3a3c;margin-bottom:4px">风险分：<span style="color:' + riskColor + ';font-weight:700">' + (resultData.prompt_risk_score || 0).toFixed(2) + '</span>（' + (resultData.severity || '—') + '）</div>'
+                    + '<div style="font-size:0.7rem;color:#3a3a3c;margin-bottom:4px">攻击类型：<span style="color:#f87171">' + (resultData.attack_types || []).join(', ') + '</span></div>'
+                    + '<div style="border-top:1px solid rgba(0,0,0,0.08);padding-top:6px;font-size:0.7rem;color:#3a3a3c">🛡️ IAM：直接拒绝</div>'
+                    + '<div style="font-size:0.65rem;color:#8e8e93;margin-top:4px">Trust: ' + (resultData.trust_score_before != null ? resultData.trust_score_before.toFixed(2) : '—') + ' ↓ ' + (resultData.trust_score != null ? resultData.trust_score.toFixed(2) : '—') + '</div>';
             } else if (status === 'degraded' && resultData && resultData.degraded) {
                 var riskColor = resultData.prompt_risk_score > 0.7 ? '#ef4444' : (resultData.prompt_risk_score > 0.35 ? '#fbbf24' : '#34d399');
                 bubble.innerHTML = '<div style="font-size:0.78rem;font-weight:700;color:#fbbf24;margin-bottom:6px">⚠️ 检测到潜在风险</div>'
-                    + '<div style="font-size:0.7rem;color:rgba(255,255,255,0.7);margin-bottom:4px">风险分：<span style="color:' + riskColor + ';font-weight:700">' + (resultData.prompt_risk_score || 0).toFixed(2) + '</span></div>'
-                    + '<div style="font-size:0.7rem;color:rgba(255,255,255,0.7);margin-bottom:4px">攻击类型：<span style="color:#fbbf24">' + (resultData.attack_types || []).join(', ') + '</span></div>'
-                    + '<div style="border-top:1px solid rgba(255,255,255,0.08);padding-top:6px;font-size:0.7rem;color:rgba(255,255,255,0.7)">🛡️ IAM：降权执行（部分能力被限制）</div>'
-                    + '<div style="font-size:0.65rem;color:rgba(255,255,255,0.4);margin-top:4px">Trust: ' + (resultData.trust_score != null ? resultData.trust_score.toFixed(2) : '—') + '</div>';
+                    + '<div style="font-size:0.7rem;color:#3a3a3c;margin-bottom:4px">风险分：<span style="color:' + riskColor + ';font-weight:700">' + (resultData.prompt_risk_score || 0).toFixed(2) + '</span></div>'
+                    + '<div style="font-size:0.7rem;color:#3a3a3c;margin-bottom:4px">攻击类型：<span style="color:#fbbf24">' + (resultData.attack_types || []).join(', ') + '</span></div>'
+                    + '<div style="border-top:1px solid rgba(0,0,0,0.08);padding-top:6px;font-size:0.7rem;color:#3a3a3c">🛡️ IAM：降权执行（部分能力被限制）</div>'
+                    + '<div style="font-size:0.65rem;color:#8e8e93;margin-top:4px">Trust: ' + (resultData.trust_score != null ? resultData.trust_score.toFixed(2) : '—') + '</div>';
             } else if (status === 'auto_revoked' && resultData) {
                 bubble.innerHTML = '<div style="font-size:0.78rem;font-weight:700;color:#ef4444;margin-bottom:6px">🔥 Agent 已被自动封禁（Auto-Revoke）</div>'
-                    + '<div style="font-size:0.7rem;color:rgba(255,255,255,0.7);margin-bottom:4px">原因：连续高风险 Prompt 行为</div>'
-                    + '<div style="font-size:0.7rem;color:rgba(255,255,255,0.7);margin-bottom:4px">所有 Token 已失效</div>'
-                    + '<div style="border-top:1px solid rgba(255,255,255,0.08);padding-top:6px;font-size:0.7rem;color:rgba(255,255,255,0.7)">Trust: ' + (resultData.trust_score_before != null ? resultData.trust_score_before.toFixed(2) : '—') + ' ↓ <span style="color:#ef4444;font-weight:700">0.00</span></div>';
+                    + '<div style="font-size:0.7rem;color:#3a3a3c;margin-bottom:4px">原因：连续高风险 Prompt 行为</div>'
+                    + '<div style="font-size:0.7rem;color:#3a3a3c;margin-bottom:4px">所有 Token 已失效</div>'
+                    + '<div style="border-top:1px solid rgba(0,0,0,0.08);padding-top:6px;font-size:0.7rem;color:#3a3a3c">Trust: ' + (resultData.trust_score_before != null ? resultData.trust_score_before.toFixed(2) : '—') + ' ↓ <span style="color:#ef4444;font-weight:700">0.00</span></div>';
             } else {
                 bubble.innerHTML = content;
             }
@@ -152,7 +152,7 @@
                         trust_before: resultData.trust_score_before,
                         trust_after: resultData.trust_score,
                     };
-                    rows.push({ key: '📋 Audit Log', val: '<pre style="margin:0;font-size:0.6rem;color:rgba(255,255,255,0.5);white-space:pre-wrap;word-break:break-all">' + JSON.stringify(auditJson, null, 2) + '</pre>' });
+                    rows.push({ key: '📋 Audit Log', val: '<pre style="margin:0;font-size:0.6rem;color:#636366;white-space:pre-wrap;word-break:break-all">' + JSON.stringify(auditJson, null, 2) + '</pre>' });
                 }
                 if (resultData.alignment && resultData.alignment.checked) {
                     var al = resultData.alignment;
@@ -354,20 +354,20 @@
                     } else if (line.indexOf('⚠️') >= 0) {
                         botHtml += '<div style="font-size:0.72rem;color:#fbbf24;margin-bottom:3px">' + line + '</div>';
                     } else {
-                        botHtml += '<div style="font-size:0.72rem;color:rgba(255,255,255,0.6);margin-bottom:3px">' + line + '</div>';
+                        botHtml += '<div style="font-size:0.72rem;color:#48484a;margin-bottom:3px">' + line + '</div>';
                     }
                 }
             }
 
             if (chain.length > 0) {
-                botHtml += '<div style="font-size:0.62rem;color:rgba(255,255,255,0.3);margin-top:6px;padding-top:4px;border-top:1px solid rgba(255,255,255,0.04);font-family:monospace">';
+                botHtml += '<div style="font-size:0.62rem;color:#8e8e93;margin-top:6px;padding-top:4px;border-top:1px solid rgba(0,0,0,0.04);font-family:monospace">';
                 botHtml += chain.join(' → ');
                 if (result.blocked_at) botHtml += ' <span style="color:#ef4444">BLOCKED@' + result.blocked_at + '</span>';
                 botHtml += '</div>';
             }
 
             if (result.trust_score != null) {
-                botHtml += '<div style="font-size:0.62rem;color:rgba(255,255,255,0.3);margin-top:2px">Trust: <span style="color:' + (result.trust_score >= 0.7 ? '#34d399' : (result.trust_score >= 0.5 ? '#fbbf24' : '#ef4444')) + ';font-weight:700">' + result.trust_score.toFixed(2) + '</span></div>';
+                botHtml += '<div style="font-size:0.62rem;color:#8e8e93;margin-top:2px">Trust: <span style="color:' + (result.trust_score >= 0.7 ? '#34d399' : (result.trust_score >= 0.5 ? '#fbbf24' : '#ef4444')) + ';font-weight:700">' + result.trust_score.toFixed(2) + '</span></div>';
             }
 
             botHtml += '</div>';
@@ -378,7 +378,7 @@
                 var al = result.alignment;
                 var alIcon = al.action === 'block' ? '🛡️' : (al.action === 'warn' ? '⚠️' : '✅');
                 var alColor = al.action === 'block' ? '#ef4444' : (al.action === 'warn' ? '#fbbf24' : '#34d399');
-                var alHtml = '<div style="font-size:0.65rem;color:rgba(255,255,255,0.4);margin-top:6px;padding-top:4px;border-top:1px solid rgba(255,255,255,0.04)">';
+                var alHtml = '<div style="font-size:0.65rem;color:#8e8e93;margin-top:6px;padding-top:4px;border-top:1px solid rgba(0,0,0,0.04)">';
                 alHtml += alIcon + ' Alignment: <span style="color:' + alColor + '">' + al.action.toUpperCase() + '</span>';
                 alHtml += ' (risk: ' + (al.risk_score || 0).toFixed(2) + ')';
                 if (al.reasons && al.reasons.length > 0) {
@@ -544,7 +544,7 @@
                         }
                         html += '</div>';
                     });
-                    stream.innerHTML = html || '<div style="color:rgba(255,255,255,0.2);font-size:0.7rem;text-align:center;padding:16px">暂无飞书事件</div>';
+                    stream.innerHTML = html || '<div style="color:#c7c7cc;font-size:0.7rem;text-align:center;padding:16px">暂无飞书事件</div>';
                 }
 
                 if (events.length > 0) {
@@ -606,14 +606,14 @@
 
         if (ngrokUrl) {
             var html = '<div style="font-size:0.78rem;font-weight:700;color:#34d399;margin-bottom:8px">✅ 飞书公网连接已就绪</div>';
-            html += '<div style="font-size:0.7rem;color:rgba(255,255,255,0.7);margin-bottom:4px">公网地址：<span style="color:#64d2ff">' + ngrokUrl + '</span></div>';
-            html += '<div style="border-top:1px solid rgba(255,255,255,0.08);padding-top:6px;margin-top:6px;font-size:0.68rem;color:rgba(255,255,255,0.5)">Webhook：' + webhookUrl + '</div>';
+            html += '<div style="font-size:0.7rem;color:#3a3a3c;margin-bottom:4px">公网地址：<span style="color:#64d2ff">' + ngrokUrl + '</span></div>';
+            html += '<div style="border-top:1px solid rgba(0,0,0,0.08);padding-top:6px;margin-top:6px;font-size:0.68rem;color:#636366">Webhook：' + webhookUrl + '</div>';
             if (isProd) {
-                html += '<div style="border-top:1px solid rgba(255,255,255,0.08);padding-top:6px;margin-top:6px;font-size:0.68rem;color:#34d399">👉 飞书机器人已就绪，可在飞书群 @机器人 发消息测试</div>';
+                html += '<div style="border-top:1px solid rgba(0,0,0,0.08);padding-top:6px;margin-top:6px;font-size:0.68rem;color:#34d399">👉 飞书机器人已就绪，可在飞书群 @机器人 发消息测试</div>';
             }
             addChatMsg('bot', html, { status: 'success' });
         } else if (isAuto) {
-            addChatMsg('bot', '<div style="font-size:0.72rem;color:rgba(255,255,255,0.4)">本地 Mock 模式 — 点击上方按钮可直接演示</div>', { status: 'info' });
+            addChatMsg('bot', '<div style="font-size:0.72rem;color:#8e8e93">本地 Mock 模式 — 点击上方按钮可直接演示</div>', { status: 'info' });
         }
 
         if (btn) {
@@ -646,16 +646,16 @@
 
                 if (!isAuto) {
                     var html = '<div style="font-size:0.78rem;font-weight:700;color:' + (connected ? '#34d399' : '#ef4444') + ';margin-bottom:8px">' + (connected ? '✅ 飞书公网连接已就绪' : '❌ 连接失败') + '</div>';
-                    html += '<div style="font-size:0.7rem;color:rgba(255,255,255,0.7);margin-bottom:4px">飞书 Token：<span style="color:' + (tokenOk ? '#34d399' : '#ef4444') + '">' + (tokenOk ? '✅ 有效' : '❌ 无效') + '</span></div>';
+                    html += '<div style="font-size:0.7rem;color:#3a3a3c;margin-bottom:4px">飞书 Token：<span style="color:' + (tokenOk ? '#34d399' : '#ef4444') + '">' + (tokenOk ? '✅ 有效' : '❌ 无效') + '</span></div>';
                     if (ngrokStarted) {
-                        html += '<div style="font-size:0.7rem;color:rgba(255,255,255,0.7);margin-bottom:4px">Ngrok 隧道：<span style="color:#fbbf24">已启动</span></div>';
+                        html += '<div style="font-size:0.7rem;color:#3a3a3c;margin-bottom:4px">Ngrok 隧道：<span style="color:#fbbf24">已启动</span></div>';
                     }
                     if (ngrokUrl) {
-                        html += '<div style="font-size:0.7rem;color:rgba(255,255,255,0.7);margin-bottom:4px">公网地址：<span style="color:#64d2ff">' + ngrokUrl + '</span></div>';
-                        html += '<div style="border-top:1px solid rgba(255,255,255,0.08);padding-top:6px;margin-top:6px;font-size:0.68rem;color:rgba(255,255,255,0.5)">Webhook：' + data.webhook_url + '</div>';
+                        html += '<div style="font-size:0.7rem;color:#3a3a3c;margin-bottom:4px">公网地址：<span style="color:#64d2ff">' + ngrokUrl + '</span></div>';
+                        html += '<div style="border-top:1px solid rgba(0,0,0,0.08);padding-top:6px;margin-top:6px;font-size:0.68rem;color:#636366">Webhook：' + data.webhook_url + '</div>';
                     }
                     if (connected) {
-                        html += '<div style="border-top:1px solid rgba(255,255,255,0.08);padding-top:6px;margin-top:6px;font-size:0.68rem;color:#34d399">👉 飞书机器人已就绪，可在飞书群 @机器人 发消息测试</div>';
+                        html += '<div style="border-top:1px solid rgba(0,0,0,0.08);padding-top:6px;margin-top:6px;font-size:0.68rem;color:#34d399">👉 飞书机器人已就绪，可在飞书群 @机器人 发消息测试</div>';
                     }
                     addChatMsg('bot', html, { status: connected ? 'success' : 'denied' });
                 }
@@ -742,7 +742,7 @@
 
                     if (step.expect === 'allow' && data.chain) {
                         html += '<div style="font-size:0.72rem;color:#34d399;margin-bottom:4px">正常请求通过 IAM 全链路验证</div>';
-                        html += '<div style="font-size:0.65rem;color:rgba(255,255,255,0.3);font-family:monospace">' + data.chain.join(' → ') + '</div>';
+                        html += '<div style="font-size:0.65rem;color:#8e8e93;font-family:monospace">' + data.chain.join(' → ') + '</div>';
                         if (data.trust_score != null) {
                             html += '<div style="font-size:0.65rem;color:#34d399;margin-top:2px">Trust: ' + data.trust_score.toFixed(2) + '</div>';
                             updateTrust(data.trust_score);
@@ -751,13 +751,13 @@
                         html += '<div style="font-size:0.72rem;color:#34d399;margin-bottom:4px">第1次请求: ' + (data.first_call.allowed ? 'ALLOWED' : 'BLOCKED') + '</div>';
                         html += '<div style="font-size:0.72rem;color:#ef4444;margin-bottom:4px">重放请求: ' + (data.replay_call && data.replay_call.allowed ? 'ALLOWED' : 'BLOCKED') + ' — Token 已被标记为已使用</div>';
                         if (data.chain) {
-                            html += '<div style="font-size:0.65rem;color:rgba(255,255,255,0.3);font-family:monospace;margin-top:4px">' + data.chain.join(' → ') + '</div>';
+                            html += '<div style="font-size:0.65rem;color:#8e8e93;font-family:monospace;margin-top:4px">' + data.chain.join(' → ') + '</div>';
                         }
                     } else if (step.expect === 'deny' && data.blocked_at) {
                         html += '<div style="font-size:0.72rem;color:#ef4444;margin-bottom:4px">越权访问被 IAM 拦截</div>';
-                        html += '<div style="font-size:0.65rem;color:rgba(255,255,255,0.4)">拦截点: ' + data.blocked_at + '</div>';
+                        html += '<div style="font-size:0.65rem;color:#8e8e93">拦截点: ' + data.blocked_at + '</div>';
                         if (data.chain) {
-                            html += '<div style="font-size:0.65rem;color:rgba(255,255,255,0.3);font-family:monospace;margin-top:4px">' + data.chain.join(' → ') + '</div>';
+                            html += '<div style="font-size:0.65rem;color:#8e8e93;font-family:monospace;margin-top:4px">' + data.chain.join(' → ') + '</div>';
                         }
                     } else if (step.expect === 'revoke' && data.steps) {
                         for (var si = 0; si < data.steps.length; si++) {
@@ -768,10 +768,10 @@
                         }
                         html += '<div style="font-size:0.72rem;color:#ef4444;font-weight:700;margin-top:6px">Agent 被自动封禁</div>';
                         if (data.chain) {
-                            html += '<div style="font-size:0.65rem;color:rgba(255,255,255,0.3);font-family:monospace;margin-top:4px">' + data.chain.join(' → ') + '</div>';
+                            html += '<div style="font-size:0.65rem;color:#8e8e93;font-family:monospace;margin-top:4px">' + data.chain.join(' → ') + '</div>';
                         }
                     } else {
-                        html += '<div style="font-size:0.72rem;color:rgba(255,255,255,0.5)">' + (data.content || status) + '</div>';
+                        html += '<div style="font-size:0.72rem;color:#636366">' + (data.content || status) + '</div>';
                     }
 
                     addChatMsg('bot', html, { status: isAllowed ? 'success' : (isRevoked ? 'auto_revoked' : 'denied') });
@@ -793,7 +793,7 @@
     function resetTrust() {
         fetchJSON(GOV_BASE + '/reset-all', { method: 'POST' })
             .then(function(data) {
-                addChatMsg('bot', '<div style="font-size:0.78rem;font-weight:700;color:#34d399">🔄 信任评分已重置</div><div style="font-size:0.7rem;color:rgba(255,255,255,0.5);margin-top:4px">所有 Agent 已恢复初始状态，可以重新开始演示</div>', { status: 'success' });
+                addChatMsg('bot', '<div style="font-size:0.78rem;font-weight:700;color:#34d399">🔄 信任评分已重置</div><div style="font-size:0.7rem;color:#636366;margin-top:4px">所有 Agent 已恢复初始状态，可以重新开始演示</div>', { status: 'success' });
                 refresh();
             })
             .catch(function(err) {
@@ -814,21 +814,21 @@
                     var statusColor = r.action === 'block' ? '#ef4444' : (r.action === 'warn' ? '#fbbf24' : '#34d399');
 
                     var html = '<div style="font-size:0.78rem;font-weight:700;color:' + statusColor + ';margin-bottom:6px">' + statusIcon + ' ' + r.name + '</div>';
-                    html += '<div style="font-size:0.7rem;color:rgba(255,255,255,0.6);margin-bottom:4px">输入：' + r.message + '</div>';
-                    html += '<div style="font-size:0.68rem;color:rgba(255,255,255,0.4);margin-bottom:4px">输出：' + r.output_preview + '</div>';
+                    html += '<div style="font-size:0.7rem;color:#48484a;margin-bottom:4px">输入：' + r.message + '</div>';
+                    html += '<div style="font-size:0.68rem;color:#8e8e93;margin-bottom:4px">输出：' + r.output_preview + '</div>';
                     html += '<div style="font-size:0.7rem;color:' + statusColor + ';margin-bottom:4px">处置：<span style="font-weight:700">' + r.action.toUpperCase() + '</span> (risk: ' + r.risk_score.toFixed(2) + ')</div>';
 
                     if (r.goal_hijack_score > 0) {
-                        html += '<div style="font-size:0.65rem;color:rgba(255,255,255,0.4)">目标偏移：' + r.goal_hijack_score.toFixed(2) + '</div>';
+                        html += '<div style="font-size:0.65rem;color:#8e8e93">目标偏移：' + r.goal_hijack_score.toFixed(2) + '</div>';
                     }
                     if (r.indirect_injection_score > 0) {
-                        html += '<div style="font-size:0.65rem;color:rgba(255,255,255,0.4)">间接注入：' + r.indirect_injection_score.toFixed(2) + '</div>';
+                        html += '<div style="font-size:0.65rem;color:#8e8e93">间接注入：' + r.indirect_injection_score.toFixed(2) + '</div>';
                     }
                     if (r.dlp_score > 0) {
-                        html += '<div style="font-size:0.65rem;color:rgba(255,255,255,0.4)">信息泄露：' + r.dlp_score.toFixed(2) + '</div>';
+                        html += '<div style="font-size:0.65rem;color:#8e8e93">信息泄露：' + r.dlp_score.toFixed(2) + '</div>';
                     }
                     if (r.reasons && r.reasons.length > 0) {
-                        html += '<div style="font-size:0.65rem;color:rgba(255,255,255,0.35);margin-top:4px">' + r.reasons.join(' | ') + '</div>';
+                        html += '<div style="font-size:0.65rem;color:#8e8e93;margin-top:4px">' + r.reasons.join(' | ') + '</div>';
                     }
 
                     addChatMsg('bot', html, { status: r.action === 'block' ? 'denied' : (r.action === 'warn' ? 'degraded' : 'success') });
@@ -838,7 +838,7 @@
                 if (insight) {
                     var insightHtml = '<div style="padding:10px 14px;border-radius:10px;background:rgba(167,139,250,0.1);border:1px solid rgba(167,139,250,0.2);margin-top:4px">';
                     insightHtml += '<div style="font-size:0.72rem;font-weight:700;color:#a78bfa;margin-bottom:6px">🛡️ 输出侧防御</div>';
-                    insightHtml += '<div style="font-size:0.68rem;color:rgba(255,255,255,0.7);line-height:1.6">' + insight + '</div>';
+                    insightHtml += '<div style="font-size:0.68rem;color:#3a3a3c;line-height:1.6">' + insight + '</div>';
                     insightHtml += '</div>';
                     addChatMsg('bot', insightHtml, { status: 'success' });
                 }
@@ -864,13 +864,13 @@
                     var isRevocation = level.indexOf('L') === 0 && level.length <= 3;
                     var isSetup = level === 'setup' || level === 'verify' || level === 'L4_setup';
                     var icon = isRevocation ? '🔴' : (isSetup ? '⚪' : '✅');
-                    var color = isRevocation ? '#ef4444' : (isSetup ? 'rgba(255,255,255,0.5)' : '#34d399');
+                    var color = isRevocation ? '#ef4444' : (isSetup ? '#636366' : '#34d399');
 
                     var html = '<div style="font-size:0.78rem;font-weight:700;color:' + color + ';margin-bottom:6px">' + icon + ' Step ' + s.step + ': ' + s.action + '</div>';
 
-                    if (s.jti) { html += '<div style="font-size:0.65rem;color:rgba(255,255,255,0.4)">JTI: ' + s.jti + '</div>'; }
-                    if (s.task_id) { html += '<div style="font-size:0.65rem;color:rgba(255,255,255,0.4)">Task: ' + s.task_id + '</div>'; }
-                    if (s.effect) { html += '<div style="font-size:0.7rem;color:rgba(255,255,255,0.6);margin-top:4px">' + s.effect + '</div>'; }
+                    if (s.jti) { html += '<div style="font-size:0.65rem;color:#8e8e93">JTI: ' + s.jti + '</div>'; }
+                    if (s.task_id) { html += '<div style="font-size:0.65rem;color:#8e8e93">Task: ' + s.task_id + '</div>'; }
+                    if (s.effect) { html += '<div style="font-size:0.7rem;color:#48484a;margin-top:4px">' + s.effect + '</div>'; }
                     if (s.key_point) { html += '<div style="font-size:0.68rem;color:#fbbf24;margin-top:4px;border-left:2px solid #fbbf24;padding-left:6px">💡 ' + s.key_point + '</div>'; }
                     if (s.cascade_count) { html += '<div style="font-size:0.65rem;color:#ef4444">级联撤销: ' + s.cascade_count + ' 个子 token</div>'; }
                     if (s.total_revoked) { html += '<div style="font-size:0.65rem;color:#ef4444">共撤销: ' + s.total_revoked + ' 个 token</div>'; }
@@ -881,10 +881,10 @@
                 if (data.key_insight) {
                     var insightHtml = '<div style="padding:10px 14px;border-radius:10px;background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.2);margin-top:4px">';
                     insightHtml += '<div style="font-size:0.72rem;font-weight:700;color:#ef4444;margin-bottom:6px">🔐 四级撤销体系</div>';
-                    insightHtml += '<div style="font-size:0.68rem;color:rgba(255,255,255,0.7);line-height:1.6">' + data.key_insight + '</div>';
+                    insightHtml += '<div style="font-size:0.68rem;color:#3a3a3c;line-height:1.6">' + data.key_insight + '</div>';
 
                     var comp = data.comparison || {};
-                    insightHtml += '<div style="margin-top:8px;font-size:0.65rem;color:rgba(255,255,255,0.5)">';
+                    insightHtml += '<div style="margin-top:8px;font-size:0.65rem;color:#636366">';
                     Object.keys(comp).forEach(function(k) {
                         insightHtml += '<div style="margin-bottom:2px">' + k + ': ' + comp[k] + '</div>';
                     });
@@ -920,26 +920,26 @@
 
                     if (isProblem) {
                         var html = '<div style="font-size:0.78rem;font-weight:700;color:#ef4444;margin-bottom:6px">❌ Step ' + s.step + ': ' + s.action + '</div>';
-                        html += '<div style="font-size:0.68rem;color:rgba(255,255,255,0.5);margin-bottom:4px">' + (s.traditional_flow || '') + '</div>';
+                        html += '<div style="font-size:0.68rem;color:#636366;margin-bottom:4px">' + (s.traditional_flow || '') + '</div>';
                         html += '<div style="font-size:0.7rem;color:#ef4444;border-left:2px solid #ef4444;padding-left:6px;margin-top:4px">⚠️ 风险：' + (s.risk || '') + '</div>';
                         addChatMsg('bot', html, { status: 'denied' });
                     } else if (isSolution) {
                         var html = '<div style="font-size:0.78rem;font-weight:700;color:#34d399;margin-bottom:6px">✅ Step ' + s.step + ': ' + s.action + '</div>';
-                        html += '<div style="font-size:0.68rem;color:rgba(255,255,255,0.5);margin-bottom:4px">' + (s.broker_flow || '') + '</div>';
+                        html += '<div style="font-size:0.68rem;color:#636366;margin-bottom:4px">' + (s.broker_flow || '') + '</div>';
                         html += '<div style="font-size:0.7rem;color:#34d399;border-left:2px solid #34d399;padding-left:6px;margin-top:4px">✅ 好处：' + (s.benefit || '') + '</div>';
                         addChatMsg('bot', html, { status: 'success' });
                     } else if (isGrant) {
                         var html = '<div style="font-size:0.78rem;font-weight:700;color:#34d399;margin-bottom:6px">✅ Step ' + s.step + ': ' + s.action + '</div>';
-                        html += '<div style="font-size:0.65rem;color:rgba(255,255,255,0.4)">Agent: ' + s.agent_id + ' | Service: ' + s.service + ' | Op: ' + s.operation + '</div>';
-                        if (s.lease_id) { html += '<div style="font-size:0.65rem;color:rgba(255,255,255,0.35)">Lease ID: ' + s.lease_id + '</div>'; }
-                        if (s.credential_keys && s.credential_keys.length > 0) { html += '<div style="font-size:0.65rem;color:rgba(255,255,255,0.35)">凭证 Keys: ' + s.credential_keys.join(', ') + '</div>'; }
-                        html += '<div style="font-size:0.66rem;color:rgba(255,255,255,0.3)">Agent 看到凭证值: ' + (s.agent_saw_credentials ? '是（危险）' : '否（安全）✅') + '</div>';
+                        html += '<div style="font-size:0.65rem;color:#8e8e93">Agent: ' + s.agent_id + ' | Service: ' + s.service + ' | Op: ' + s.operation + '</div>';
+                        if (s.lease_id) { html += '<div style="font-size:0.65rem;color:#8e8e93">Lease ID: ' + s.lease_id + '</div>'; }
+                        if (s.credential_keys && s.credential_keys.length > 0) { html += '<div style="font-size:0.65rem;color:#8e8e93">凭证 Keys: ' + s.credential_keys.join(', ') + '</div>'; }
+                        html += '<div style="font-size:0.66rem;color:#8e8e93">Agent 看到凭证值: ' + (s.agent_saw_credentials ? '是（危险）' : '否（安全）✅') + '</div>';
                         if (s.key_insight) { html += '<div style="font-size:0.68rem;color:#fbbf24;margin-top:4px">💡 ' + s.key_insight + '</div>'; }
                         addChatMsg('bot', html, { status: 'success' });
                     } else if (isDeny) {
                         var html = '<div style="font-size:0.78rem;font-weight:700;color:#ef4444;margin-bottom:6px">🚫 Step ' + s.step + ': ' + s.action + '</div>';
-                        html += '<div style="font-size:0.65rem;color:rgba(255,255,255,0.4)">Agent: ' + s.agent_id + ' | Service: ' + s.service + '</div>';
-                        if (s.error) { html += '<div style="font-size:0.7rem;color:rgba(239,68,68,0.8);margin-top:4px">' + s.error + '</div>'; }
+                        html += '<div style="font-size:0.65rem;color:#8e8e93">Agent: ' + s.agent_id + ' | Service: ' + s.service + '</div>';
+                        if (s.error) { html += '<div style="font-size:0.7rem;color:#ef4444;margin-top:4px">' + s.error + '</div>'; }
                         if (s.key_insight) { html += '<div style="font-size:0.68rem;color:#fbbf24;margin-top:4px">💡 ' + s.key_insight + '</div>'; }
                         addChatMsg('bot', html, { status: 'denied' });
                     } else if (isScope || isLease || isVault) {
@@ -947,7 +947,7 @@
                         var color = '#a78bfa';
                         var html = '<div style="font-size:0.78rem;font-weight:700;color:' + color + ';margin-bottom:6px">' + icon + ' Step ' + s.step + ': ' + s.action + '</div>';
                         if (s.vault_sample) {
-                            html += '<div style="font-size:0.62rem;color:rgba(255,255,255,0.3);margin-top:4px">';
+                            html += '<div style="font-size:0.62rem;color:#8e8e93;margin-top:4px">';
                             for (var v in s.vault_sample) {
                                 html += '  ' + s.vault_sample[v].service + '.' + s.vault_sample[v].key + ' = ' + s.vault_sample[v].masked + '<br/>';
                             }
@@ -956,8 +956,8 @@
                         if (s.key_insight) { html += '<div style="font-size:0.68rem;color:#fbbf24;margin-top:4px">💡 ' + s.key_insight + '</div>'; }
                         addChatMsg('bot', html, { status: 'success' });
                     } else {
-                        var html = '<div style="font-size:0.78rem;font-weight:700;color:rgba(255,255,255,0.8);margin-bottom:6px">Step ' + s.step + ': ' + s.action + '</div>';
-                        if (s.key_insight) { html += '<div style="font-size:0.68rem;color:rgba(255,255,255,0.5)">' + s.key_insight + '</div>'; }
+                        var html = '<div style="font-size:0.78rem;font-weight:700;color:#1d1d1f;margin-bottom:6px">Step ' + s.step + ': ' + s.action + '</div>';
+                        if (s.key_insight) { html += '<div style="font-size:0.68rem;color:#636366">' + s.key_insight + '</div>'; }
                         addChatMsg('bot', html);
                     }
                 }
@@ -965,12 +965,12 @@
                 if (data.key_insight) {
                     var insightHtml = '<div style="padding:10px 14px;border-radius:10px;background:rgba(59,130,246,0.08);border:1px solid rgba(59,130,246,0.2);margin-top:4px">';
                     insightHtml += '<div style="font-size:0.72rem;font-weight:700;color:#3b82f6;margin-bottom:6px">🔑 凭证经纪人模式</div>';
-                    insightHtml += '<div style="font-size:0.68rem;color:rgba(255,255,255,0.7);line-height:1.6">' + data.key_insight + '</div>';
+                    insightHtml += '<div style="font-size:0.68rem;color:#3a3a3c;line-height:1.6">' + data.key_insight + '</div>';
 
                     var comp = data.comparison || {};
-                    insightHtml += '<div style="margin-top:8px;font-size:0.65rem;color:rgba(255,255,255,0.5)">';
+                    insightHtml += '<div style="margin-top:8px;font-size:0.65rem;color:#636366">';
                     Object.keys(comp).forEach(function(k) {
-                        insightHtml += '<div style="margin-bottom:2px"><span style="color:rgba(255,255,255,0.7)">' + k + ':</span> ' + comp[k] + '</div>';
+                        insightHtml += '<div style="margin-bottom:2px"><span style="color:#3a3a3c">' + k + ':</span> ' + comp[k] + '</div>';
                     });
                     insightHtml += '</div></div>';
                     addChatMsg('bot', insightHtml, { status: 'success' });
@@ -1004,12 +1004,12 @@
                     var s = steps[i];
                     html += '<div style="margin-bottom:8px;padding:6px 8px;border-radius:6px;background:rgba(59,130,246,0.06)">';
                     html += '<div style="font-size:0.72rem;font-weight:600;color:#60a5fa">Step ' + s.step + ': ' + s.action + '</div>';
-                    if (s.tool_names) { html += '<div style="font-size:0.62rem;color:rgba(255,255,255,0.4);margin-top:2px">Tools: ' + s.tool_names.join(', ') + '</div>'; }
+                    if (s.tool_names) { html += '<div style="font-size:0.62rem;color:#8e8e93;margin-top:2px">Tools: ' + s.tool_names.join(', ') + '</div>'; }
                     if (s.key_point) { html += '<div style="font-size:0.66rem;color:#fbbf24;margin-top:3px">💡 ' + s.key_point + '</div>'; }
                     html += '</div>';
                 }
                 if (data.key_insight) {
-                    html += '<div style="font-size:0.68rem;color:rgba(255,255,255,0.6);margin-top:6px;padding:6px 8px;border-left:2px solid #3b82f6">' + data.key_insight + '</div>';
+                    html += '<div style="font-size:0.68rem;color:#48484a;margin-top:6px;padding:6px 8px;border-left:2px solid #3b82f6">' + data.key_insight + '</div>';
                 }
                 addChatMsg('bot', html, { status: 'success' });
             })
@@ -1026,16 +1026,16 @@
                     var s = steps[i];
                     html += '<div style="margin-bottom:8px;padding:6px 8px;border-radius:6px;background:rgba(167,139,250,0.06)">';
                     html += '<div style="font-size:0.72rem;font-weight:600;color:#a78bfa">Step ' + s.step + ': ' + s.action + '</div>';
-                    if (s.skills) { html += '<div style="font-size:0.62rem;color:rgba(255,255,255,0.4);margin-top:2px">Skills: ' + s.skills.join(', ') + '</div>'; }
+                    if (s.skills) { html += '<div style="font-size:0.62rem;color:#8e8e93;margin-top:2px">Skills: ' + s.skills.join(', ') + '</div>'; }
                     if (s.key_point) { html += '<div style="font-size:0.66rem;color:#fbbf24;margin-top:3px">💡 ' + s.key_point + '</div>'; }
                     html += '</div>';
                 }
                 if (data.key_insight) {
-                    html += '<div style="font-size:0.68rem;color:rgba(255,255,255,0.6);margin-top:6px;padding:6px 8px;border-left:2px solid #a78bfa">' + data.key_insight + '</div>';
+                    html += '<div style="font-size:0.68rem;color:#48484a;margin-top:6px;padding:6px 8px;border-left:2px solid #a78bfa">' + data.key_insight + '</div>';
                 }
                 var comp = data.mcp_vs_a2a || {};
-                html += '<div style="margin-top:8px;font-size:0.65rem;color:rgba(255,255,255,0.4);padding:6px 8px;border-radius:6px;background:rgba(255,255,255,0.03)">';
-                html += '<div style="font-weight:600;color:rgba(255,255,255,0.6);margin-bottom:4px">MCP vs A2A 互补关系</div>';
+                html += '<div style="margin-top:8px;font-size:0.65rem;color:#8e8e93;padding:6px 8px;border-radius:6px;background:#fafafa">';
+                html += '<div style="font-weight:600;color:#48484a;margin-bottom:4px">MCP vs A2A 互补关系</div>';
                 if (comp.MCP) { html += '<div>MCP: ' + comp.MCP + '</div>'; }
                 if (comp.A2A) { html += '<div>A2A: ' + comp.A2A + '</div>'; }
                 if (comp['互补关系']) { html += '<div style="color:#fbbf24">💡 ' + comp['互补关系'] + '</div>'; }
@@ -1070,15 +1070,15 @@
                     var color = isError ? '#ef4444' : (isAuth ? '#3b82f6' : (isToken ? '#fbbf24' : (isValidate ? '#34d399' : (isIdToken ? '#a78bfa' : (isNl ? '#60a5fa' : '#94a3b8')))));
 
                     var html = '<div style="font-size:0.78rem;font-weight:700;color:' + color + ';margin-bottom:6px">' + icon + ' Step ' + s.step + ': ' + s.action + '</div>';
-                    if (s.flow) { html += '<div style="font-size:0.66rem;color:rgba(255,255,255,0.4);margin-bottom:3px">Flow: ' + s.flow + '</div>'; }
+                    if (s.flow) { html += '<div style="font-size:0.66rem;color:#8e8e93;margin-bottom:3px">Flow: ' + s.flow + '</div>'; }
                     if (s.granted_scopes && s.granted_scopes.length > 0) { html += '<div style="font-size:0.66rem;color:#34d399">✅ Granted: ' + s.granted_scopes.join(', ') + '</div>'; }
                     if (s.denied_scopes && s.denied_scopes.length > 0) { html += '<div style="font-size:0.66rem;color:#ef4444">❌ Denied: ' + s.denied_scopes.join(', ') + '</div>'; }
-                    if (s.trust_score != null) { html += '<div style="font-size:0.66rem;color:rgba(255,255,255,0.4)">Trust: ' + s.trust_score.toFixed(2) + '</div>'; }
-                    if (s.agent_id) { html += '<div style="font-size:0.66rem;color:rgba(255,255,255,0.35)">Agent: ' + s.agent_id + '</div>'; }
-                    if (s.capabilities) { html += '<div style="font-size:0.62rem;color:rgba(255,255,255,0.3)">Capabilities: ' + s.capabilities.join(', ') + '</div>'; }
-                    if (s.delegation_chain) { html += '<div style="font-size:0.62rem;color:rgba(255,255,255,0.3)">Chain: ' + s.delegation_chain.join(' → ') + '</div>'; }
+                    if (s.trust_score != null) { html += '<div style="font-size:0.66rem;color:#8e8e93">Trust: ' + s.trust_score.toFixed(2) + '</div>'; }
+                    if (s.agent_id) { html += '<div style="font-size:0.66rem;color:#8e8e93">Agent: ' + s.agent_id + '</div>'; }
+                    if (s.capabilities) { html += '<div style="font-size:0.62rem;color:#8e8e93">Capabilities: ' + s.capabilities.join(', ') + '</div>'; }
+                    if (s.delegation_chain) { html += '<div style="font-size:0.62rem;color:#8e8e93">Chain: ' + s.delegation_chain.join(' → ') + '</div>'; }
                     if (s.nl_input) { html += '<div style="font-size:0.66rem;color:#60a5fa">NL: "' + s.nl_input + '" → ' + (s.translated_scopes || []).join(', ') + '</div>'; }
-                    if (s.acr) { html += '<div style="font-size:0.62rem;color:rgba(255,255,255,0.3)">ACR: ' + s.acr + ' | AMR: ' + (s.amr || []).join('+') + '</div>'; }
+                    if (s.acr) { html += '<div style="font-size:0.62rem;color:#8e8e93">ACR: ' + s.acr + ' | AMR: ' + (s.amr || []).join('+') + '</div>'; }
                     if (s.key_point) { html += '<div style="font-size:0.68rem;color:#fbbf24;margin-top:4px;border-left:2px solid #fbbf24;padding-left:6px">💡 ' + s.key_point + '</div>'; }
 
                     addChatMsg('bot', html, { status: isError ? 'denied' : 'success' });
@@ -1087,16 +1087,16 @@
                 if (data.key_insight) {
                     var insightHtml = '<div style="padding:10px 14px;border-radius:10px;background:rgba(59,130,246,0.08);border:1px solid rgba(59,130,246,0.2);margin-top:4px">';
                     insightHtml += '<div style="font-size:0.72rem;font-weight:700;color:#3b82f6;margin-bottom:6px">🎫 OAuth 2.0 / OIDC 委派扩展</div>';
-                    insightHtml += '<div style="font-size:0.68rem;color:rgba(255,255,255,0.7);line-height:1.6">' + data.key_insight + '</div>';
+                    insightHtml += '<div style="font-size:0.68rem;color:#3a3a3c;line-height:1.6">' + data.key_insight + '</div>';
 
                     var comp = data.comparison || {};
-                    insightHtml += '<div style="margin-top:8px;font-size:0.65rem;color:rgba(255,255,255,0.5)">';
+                    insightHtml += '<div style="margin-top:8px;font-size:0.65rem;color:#636366">';
                     Object.keys(comp).forEach(function(k) {
-                        insightHtml += '<div style="margin-bottom:2px"><span style="color:rgba(255,255,255,0.7)">' + k + ':</span> ' + comp[k] + '</div>';
+                        insightHtml += '<div style="margin-bottom:2px"><span style="color:#3a3a3c">' + k + ':</span> ' + comp[k] + '</div>';
                     });
 
                     var idp = data.idp_compatibility || {};
-                    insightHtml += '<div style="margin-top:6px;font-size:0.62rem;color:rgba(255,255,255,0.4)">';
+                    insightHtml += '<div style="margin-top:6px;font-size:0.62rem;color:#8e8e93">';
                     Object.keys(idp).forEach(function(k) {
                         insightHtml += '<div>' + k + ': ' + idp[k] + '</div>';
                     });
@@ -1142,7 +1142,7 @@
                     var icon = riskIcons[riskKey] || '📌';
 
                     var html = '<div style="font-size:0.78rem;font-weight:700;color:' + color + ';margin-bottom:6px">' + icon + ' Step ' + s.step + ': ' + s.action + '</div>';
-                    if (s.risk) { html += '<div style="font-size:0.62rem;color:rgba(255,255,255,0.3);margin-bottom:3px">' + s.risk + '</div>'; }
+                    if (s.risk) { html += '<div style="font-size:0.62rem;color:#8e8e93;margin-bottom:3px">' + s.risk + '</div>'; }
 
                     if (s.official_tool) {
                         html += '<div style="font-size:0.66rem;color:#34d399">✅ 官方工具: ' + s.official_tool.name + ' (trust: ' + s.official_tool.trust + ')</div>';
@@ -1158,7 +1158,7 @@
                     }
                     if (s.poison_attempted !== undefined) {
                         html += '<div style="font-size:0.66rem;color:#fbbf24">⚠️ 投毒尝试: ' + (s.integrity_violation ? '检测到篡改 ✅' : '未检测到') + '</div>';
-                        if (s.integrity_check) { html += '<div style="font-size:0.62rem;color:rgba(255,255,255,0.4)">完整性: verified=' + s.integrity_check.verified + ', tampered=' + s.integrity_check.tampered + '</div>'; }
+                        if (s.integrity_check) { html += '<div style="font-size:0.62rem;color:#8e8e93">完整性: verified=' + s.integrity_check.verified + ', tampered=' + s.integrity_check.tampered + '</div>'; }
                     }
                     if (s.doc_agent_status) {
                         html += '<div style="font-size:0.66rem;color:#ef4444">🔴 doc_agent: ' + s.doc_agent_status + ' (circuit=' + s.circuit_open + ')</div>';
@@ -1170,13 +1170,13 @@
                     if (s.data_agent_budget) {
                         html += '<div style="font-size:0.66rem;color:#3b82f6">📊 data_agent: ' + s.data_agent_budget + '/天</div>';
                         html += '<div style="font-size:0.66rem;color:#3b82f6">📊 doc_agent: ' + s.doc_agent_budget + '/天</div>';
-                        html += '<div style="font-size:0.62rem;color:rgba(255,255,255,0.4)">告警阈值: ' + s.alert_threshold + ' | 硬限制: ' + s.hard_limit + '</div>';
+                        html += '<div style="font-size:0.62rem;color:#8e8e93">告警阈值: ' + s.alert_threshold + ' | 硬限制: ' + s.hard_limit + '</div>';
                     }
                     if (s.daily_usage_pct !== undefined && s.level && s.level.indexOf('asi09') >= 0) {
                         var usageColor = s.action === 'block' ? '#ef4444' : (s.action === 'throttle' ? '#fbbf24' : '#34d399');
                         var actionLabel = s.action === 'block' ? '🚫 阻断' : (s.action === 'throttle' ? '⚠️ 节流' : '✅ 放行');
                         html += '<div style="font-size:0.66rem;color:' + usageColor + '">💵 日消费: ' + s.daily_usage_pct.toFixed(1) + '% → ' + actionLabel + '</div>';
-                        if (s.reason) { html += '<div style="font-size:0.62rem;color:rgba(255,255,255,0.4)">原因: ' + s.reason.substring(0, 50) + '</div>'; }
+                        if (s.reason) { html += '<div style="font-size:0.62rem;color:#8e8e93">原因: ' + s.reason.substring(0, 50) + '</div>'; }
                     }
                     if (s.agents_summary) {
                         var agents = s.agents_summary;
@@ -1207,7 +1207,7 @@
                 }
 
                 if (data.key_insight) {
-                    addChatMsg('bot', '<div style="font-size:0.68rem;color:rgba(255,255,255,0.6);padding:6px 8px;border-left:2px solid #ef4444">' + data.key_insight + '</div>', { status: 'success' });
+                    addChatMsg('bot', '<div style="font-size:0.68rem;color:#48484a;padding:6px 8px;border-left:2px solid #ef4444">' + data.key_insight + '</div>', { status: 'success' });
                 }
             })
             .catch(function(err) {
@@ -1246,26 +1246,26 @@
                     var icon = featureIcons[featureKey] || '⚙️';
 
                     var html = '<div style="font-size:0.78rem;font-weight:700;color:' + color + ';margin-bottom:6px">' + icon + ' Step ' + s.step + ': ' + s.action + '</div>';
-                    if (s.feature) { html += '<div style="font-size:0.62rem;color:rgba(255,255,255,0.3);margin-bottom:3px">' + s.feature + '</div>'; }
+                    if (s.feature) { html += '<div style="font-size:0.62rem;color:#8e8e93;margin-bottom:3px">' + s.feature + '</div>'; }
 
                     if (s.fingerprint) {
-                        html += '<div style="font-size:0.66rem;color:#06b6d4">🔑 指纹: ' + s.fingerprint + '</div>';
+                        html += '<div style="font-size:0.66rem;color:#0071e3">🔑 指纹: ' + s.fingerprint + '</div>';
                         html += '<div style="font-size:0.66rem;color:#34d399">✅ 私钥: ' + (s.has_private_key ? '本地保留' : '无') + ' | 公钥: ' + (s.has_public_key ? '已注册' : '无') + '</div>';
                     }
                     if (s.registered !== undefined && s.level === 'ed25519_register') {
                         html += '<div style="font-size:0.66rem;color:' + (s.registered ? '#34d399' : '#ef4444') + '">' + (s.registered ? '✅ 公钥注册成功' : '❌ 注册失败') + '</div>';
                     }
                     if (s.challenge_id) {
-                        html += '<div style="font-size:0.66rem;color:#06b6d4">🎲 挑战ID: ' + s.challenge_id + '</div>';
-                        html += '<div style="font-size:0.66rem;color:rgba(255,255,255,0.4)">预览: ' + s.challenge_preview + ' | 过期: ' + s.expires_in + 's</div>';
+                        html += '<div style="font-size:0.66rem;color:#0071e3">🎲 挑战ID: ' + s.challenge_id + '</div>';
+                        html += '<div style="font-size:0.66rem;color:#8e8e93">预览: ' + s.challenge_preview + ' | 过期: ' + s.expires_in + 's</div>';
                     }
                     if (s.verified !== undefined && s.level === 'ed25519_verify') {
                         html += '<div style="font-size:0.66rem;color:' + (s.verified ? '#34d399' : '#ef4444') + '">' + (s.verified ? '✅ Ed25519 签名验证通过' : '❌ 验证失败') + '</div>';
-                        if (s.session_token) { html += '<div style="font-size:0.62rem;color:rgba(255,255,255,0.4)">Session: ' + s.session_token + '</div>'; }
+                        if (s.session_token) { html += '<div style="font-size:0.62rem;color:#8e8e93">Session: ' + s.session_token + '</div>'; }
                     }
                     if (s.fake_verified !== undefined) {
                         html += '<div style="font-size:0.66rem;color:#ef4444">🚫 伪造签名: ' + (s.fake_verified ? '通过' : '被拒绝 ✅') + '</div>';
-                        if (s.fake_reason) { html += '<div style="font-size:0.62rem;color:rgba(255,255,255,0.4)">原因: ' + s.fake_reason.substring(0, 40) + '</div>'; }
+                        if (s.fake_reason) { html += '<div style="font-size:0.62rem;color:#8e8e93">原因: ' + s.fake_reason.substring(0, 40) + '</div>'; }
                     }
                     if (s.rules_loaded !== undefined) {
                         html += '<div style="font-size:0.66rem;color:#8b5cf6">📋 加载规则数: ' + s.rules_loaded + '</div>';
@@ -1281,7 +1281,7 @@
                     }
                     if (s.splunk_events !== undefined) {
                         html += '<div style="font-size:0.66rem;color:#f59e0b">📊 Splunk: ' + s.splunk_events + ' events | ELK: ' + s.elk_events + ' events</div>';
-                        if (s.export_formats) { html += '<div style="font-size:0.62rem;color:rgba(255,255,255,0.4)">格式: ' + s.export_formats.join(', ') + '</div>'; }
+                        if (s.export_formats) { html += '<div style="font-size:0.62rem;color:#8e8e93">格式: ' + s.export_formats.join(', ') + '</div>'; }
                     }
                     if (s.soc2_criteria !== undefined) {
                         html += '<div style="font-size:0.66rem;color:#f59e0b">📋 SOC2: ' + s.soc2_criteria + ' 项标准 | HIPAA: ' + s.hipaa_safeguards + ' 项保障</div>';
@@ -1301,7 +1301,7 @@
                         html += '<div style="font-size:0.66rem;color:' + (s.confirmed ? '#34d399' : '#fbbf24') + '">' + (s.confirmed ? '✅ 规则已人工确认' : '⏳ 等待确认') + '</div>';
                     }
                     if (s.extracted_conditions && s.extracted_conditions.length > 0) {
-                        html += '<div style="font-size:0.62rem;color:rgba(255,255,255,0.4)">条件: ' + s.extracted_conditions.join(', ') + '</div>';
+                        html += '<div style="font-size:0.62rem;color:#8e8e93">条件: ' + s.extracted_conditions.join(', ') + '</div>';
                     }
                     if (s.key_point) { html += '<div style="font-size:0.68rem;color:#fbbf24;margin-top:4px;border-left:2px solid ' + color + ';padding-left:6px">💡 ' + s.key_point + '</div>'; }
 
@@ -1312,7 +1312,7 @@
                     var featHtml = '<div style="padding:10px 14px;border-radius:10px;background:rgba(139,92,246,0.06);border:1px solid rgba(139,92,246,0.15);margin-top:4px">';
                     featHtml += '<div style="font-size:0.72rem;font-weight:700;color:#8b5cf6;margin-bottom:8px">⚙️ P2 工程化升级功能</div>';
                     Object.keys(data.features).forEach(function(k) {
-                        featHtml += '<div style="font-size:0.65rem;color:#06b6d4;margin-bottom:2px">' + k + ': ' + data.features[k] + '</div>';
+                        featHtml += '<div style="font-size:0.65rem;color:#0071e3;margin-bottom:2px">' + k + ': ' + data.features[k] + '</div>';
                     });
                     featHtml += '</div>';
                     addChatMsg('bot', featHtml, { status: 'success' });
@@ -1336,19 +1336,19 @@
                 var layers = arch.layers || [];
                 var layerHtml = '<div style="padding:12px 16px;border-radius:12px;background:linear-gradient(135deg,rgba(239,68,68,0.08),rgba(249,115,22,0.08));border:1px solid rgba(239,68,68,0.2);margin-bottom:8px">';
                 layerHtml += '<div style="font-size:0.82rem;font-weight:700;color:#ef4444;margin-bottom:4px">🧱 AgentPass 六层安全架构</div>';
-                layerHtml += '<div style="font-size:0.68rem;color:rgba(255,255,255,0.5);margin-bottom:10px">' + (arch.tagline || '') + '</div>';
+                layerHtml += '<div style="font-size:0.68rem;color:#636366;margin-bottom:10px">' + (arch.tagline || '') + '</div>';
 
                 for (var i = 0; i < layers.length; i++) {
                     var l = layers[i];
                     var isCore = l.is_core || false;
-                    var borderColor = isCore ? '#ef4444' : 'rgba(255,255,255,0.1)';
-                    var bgColor = isCore ? 'rgba(239,68,68,0.12)' : 'rgba(255,255,255,0.03)';
+                    var borderColor = isCore ? '#ef4444' : '#e5e5ea';
+                    var bgColor = isCore ? 'rgba(239,68,68,0.12)' : 'rgba(0,0,0,0.03)';
                     var nameColor = isCore ? '#ef4444' : '#94a3b8';
                     var fontWeight = isCore ? '700' : '500';
 
                     layerHtml += '<div style="padding:8px 10px;margin-bottom:4px;border-radius:8px;border-left:3px solid ' + borderColor + ';background:' + bgColor + '">';
                     layerHtml += '<div style="font-size:0.72rem;font-weight:' + fontWeight + ';color:' + nameColor + '">' + l.icon + ' ' + l.id + ': ' + l.name + '（' + l.name_cn + '）' + (isCore ? ' ⭐ CORE' : '') + '</div>';
-                    layerHtml += '<div style="font-size:0.62rem;color:rgba(255,255,255,0.4);margin-top:2px">👉 ' + l.principle_cn + '</div>';
+                    layerHtml += '<div style="font-size:0.62rem;color:#8e8e93;margin-top:2px">👉 ' + l.principle_cn + '</div>';
                     if (isCore && l.core_innovation_cn) {
                         layerHtml += '<div style="font-size:0.66rem;color:#f97316;margin-top:3px;font-weight:600">🧨 ' + l.core_innovation_cn + '</div>';
                     }
@@ -1365,7 +1365,7 @@
                     var thColor = th.is_core ? '#ef4444' : '#06b6d4';
                     var thWeight = th.is_core ? '700' : '500';
                     threeHtml += '<div style="font-size:0.68rem;color:' + thColor + ';margin-bottom:4px;font-weight:' + thWeight + '">' + (th.is_core ? '🔥 ' : '👉 ') + th.point_cn + '</div>';
-                    threeHtml += '<div style="font-size:0.60rem;color:rgba(255,255,255,0.3);margin-left:16px;margin-bottom:4px">' + th.evidence + '</div>';
+                    threeHtml += '<div style="font-size:0.60rem;color:#8e8e93;margin-left:16px;margin-bottom:4px">' + th.evidence + '</div>';
                 }
                 threeHtml += '</div>';
                 addChatMsg('bot', threeHtml, { status: 'success' });
@@ -1385,17 +1385,17 @@
                     if (level === 'traditional') {
                         html = '<div style="padding:10px 14px;border-radius:10px;background:rgba(148,163,184,0.06);border:1px solid rgba(148,163,184,0.15)">';
                         html += '<div style="font-size:0.72rem;font-weight:600;color:#94a3b8;margin-bottom:4px">❌ 传统 IAM</div>';
-                        html += '<div style="font-size:0.68rem;color:rgba(255,255,255,0.5)">' + s.title + '</div>';
+                        html += '<div style="font-size:0.68rem;color:#636366">' + s.title + '</div>';
                         html += '<div style="font-size:0.66rem;color:#94a3b8;margin-top:4px;font-family:monospace">' + s.flow + '</div>';
                         html += '<div style="font-size:0.62rem;color:#ef4444;margin-top:4px">⚠️ ' + s.problem + '</div>';
                         html += '</div>';
                     } else if (level === 'risk_scoring') {
                         html = '<div style="padding:10px 14px;border-radius:10px;background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.2)">';
                         html += '<div style="font-size:0.72rem;font-weight:700;color:#ef4444;margin-bottom:4px">🔥 Step 2: 语义分析 → 风险评分</div>';
-                        html += '<div style="font-size:0.66rem;color:rgba(255,255,255,0.5);font-family:monospace;margin-bottom:6px">' + s.flow + '</div>';
+                        html += '<div style="font-size:0.66rem;color:#636366;font-family:monospace;margin-bottom:6px">' + s.flow + '</div>';
                         var d = s.detail || {};
                         html += '<div style="font-size:0.64rem;color:#fbbf24;margin-bottom:2px">📝 输入: "' + (d.input || '').substring(0, 30) + '..."</div>';
-                        html += '<div style="font-size:0.62rem;color:#06b6d4">🔍 规则检测: ' + (d.rule_detection || '') + '</div>';
+                        html += '<div style="font-size:0.62rem;color:#0071e3">🔍 规则检测: ' + (d.rule_detection || '') + '</div>';
                         html += '<div style="font-size:0.62rem;color:#8b5cf6">🔍 语义检测: ' + (d.semantic_detection || '') + '</div>';
                         html += '<div style="font-size:0.62rem;color:#f59e0b">🔍 行为检测: ' + (d.behavior_detection || '') + '</div>';
                         html += '<div style="font-size:0.68rem;color:#ef4444;font-weight:700;margin-top:4px">⚡ 最终风险: ' + d.final_risk + '</div>';
@@ -1403,7 +1403,7 @@
                     } else if (level === 'trust_decay') {
                         html = '<div style="padding:10px 14px;border-radius:10px;background:rgba(249,115,22,0.08);border:1px solid rgba(249,115,22,0.2)">';
                         html += '<div style="font-size:0.72rem;font-weight:700;color:#f97316;margin-bottom:4px">🔥 Step 3: Risk → Trust Score 衰减</div>';
-                        html += '<div style="font-size:0.66rem;color:rgba(255,255,255,0.5);font-family:monospace;margin-bottom:6px">' + s.flow + '</div>';
+                        html += '<div style="font-size:0.66rem;color:#636366;font-family:monospace;margin-bottom:6px">' + s.flow + '</div>';
                         var d2 = s.detail || {};
                         html += '<div style="font-size:0.66rem;color:#34d399">Trust: ' + d2.before_trust + ' → <span style="color:#f97316">' + d2.after_trust + '</span> (惩罚: ' + d2.trust_penalty + ')</div>';
                         html += '<div style="font-size:0.66rem;color:#fbbf24">等级变化: ' + (d2.trust_level_change || '') + '</div>';
@@ -1412,7 +1412,7 @@
                     } else if (level === 'capability_contraction') {
                         html = '<div style="padding:10px 14px;border-radius:10px;background:rgba(139,92,246,0.08);border:1px solid rgba(139,92,246,0.2)">';
                         html += '<div style="font-size:0.72rem;font-weight:700;color:#8b5cf6;margin-bottom:4px">🔥 Step 4: Trust → 权限收缩</div>';
-                        html += '<div style="font-size:0.66rem;color:rgba(255,255,255,0.5);font-family:monospace;margin-bottom:6px">' + s.flow + '</div>';
+                        html += '<div style="font-size:0.66rem;color:#636366;font-family:monospace;margin-bottom:6px">' + s.flow + '</div>';
                         var d3 = s.detail || {};
                         var beforeCaps = (d3.trust_0_85_capabilities || []).join(', ');
                         var afterCaps = (d3.trust_0_65_capabilities || []).join(', ');
@@ -1426,7 +1426,7 @@
                     } else if (level === 'auto_revoke') {
                         html = '<div style="padding:10px 14px;border-radius:10px;background:rgba(239,68,68,0.12);border:1px solid rgba(239,68,68,0.3)">';
                         html += '<div style="font-size:0.72rem;font-weight:700;color:#ef4444;margin-bottom:4px">🔥 Step 5: 连续攻击 → 自动封禁</div>';
-                        html += '<div style="font-size:0.66rem;color:rgba(255,255,255,0.5);font-family:monospace;margin-bottom:6px">' + s.flow + '</div>';
+                        html += '<div style="font-size:0.66rem;color:#636366;font-family:monospace;margin-bottom:6px">' + s.flow + '</div>';
                         var d4 = s.detail || {};
                         html += '<div style="font-size:0.62rem;color:#fbbf24">Attack 1: ' + (d4.attack_1 || '') + '</div>';
                         html += '<div style="font-size:0.62rem;color:#f97316">Attack 2: ' + (d4.attack_2 || '') + '</div>';
@@ -1438,7 +1438,7 @@
                     } else if (level === 'core_summary') {
                         html = '<div style="padding:14px 18px;border-radius:12px;background:linear-gradient(135deg,rgba(239,68,68,0.1),rgba(249,115,22,0.1));border:2px solid rgba(239,68,68,0.3)">';
                         html += '<div style="font-size:0.82rem;font-weight:700;color:#ef4444;margin-bottom:6px">🧨 核心创新：语义驱动的 IAM</div>';
-                        html += '<div style="font-size:0.68rem;color:rgba(255,255,255,0.5);margin-bottom:8px">' + (s.innovation_cn || '') + '</div>';
+                        html += '<div style="font-size:0.68rem;color:#636366;margin-bottom:8px">' + (s.innovation_cn || '') + '</div>';
                         var comp = s.comparison || {};
                         html += '<div style="font-size:0.64rem;color:#94a3b8;margin-bottom:2px">❌ 传统: <span style="font-family:monospace">' + (comp.traditional || '') + '</span></div>';
                         html += '<div style="font-size:0.66rem;color:#ef4444;font-weight:700;margin-bottom:8px">✅ AgentPass: <span style="font-family:monospace">' + (comp.agentpass || '') + '</span></div>';
@@ -1466,7 +1466,7 @@
                 var scenarios = data.scenarios || [];
                 var headerHtml = '<div style="padding:12px 16px;border-radius:12px;background:linear-gradient(135deg,rgba(239,68,68,0.1),rgba(16,185,129,0.05));border:2px solid rgba(239,68,68,0.3);margin-top:6px">';
                 headerHtml += '<div style="font-size:0.78rem;font-weight:700;color:#ef4444;margin-bottom:4px">🔬 六层架构实时验证 — 每一个请求，六层架构实时运行</div>';
-                headerHtml += '<div style="font-size:0.62rem;color:rgba(255,255,255,0.4);margin-bottom:8px">我们不仅设计了一套六层安全架构，更重要的是，这六层架构会在每一次 Agent 请求中被实时执行和记录。</div>';
+                headerHtml += '<div style="font-size:0.62rem;color:#8e8e93;margin-bottom:8px">我们不仅设计了一套六层安全架构，更重要的是，这六层架构会在每一次 Agent 请求中被实时执行和记录。</div>';
                 headerHtml += '</div>';
                 addChatMsg('bot', headerHtml, { status: 'success' });
 
@@ -1476,7 +1476,7 @@
                     var layers = v.layers || [];
                     var overallColor = v.overall_status === 'SECURE' ? '#34d399' : (v.overall_status === 'DEGRADED' ? '#fbbf24' : '#ef4444');
 
-                    var html = '<div style="padding:10px 14px;border-radius:10px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.08);margin-top:4px">';
+                    var html = '<div style="padding:10px 14px;border-radius:10px;background:#fafafa;border:1px solid rgba(0,0,0,0.08);margin-top:4px">';
                     html += '<div style="font-size:0.72rem;font-weight:700;color:' + overallColor + ';margin-bottom:6px">' + sc.scenario + ' → ' + v.overall_status + '</div>';
 
                     for (var j = 0; j < layers.length; j++) {
@@ -1507,8 +1507,8 @@
                 var summary = data.summary || {};
 
                 var headerHtml = '<div style="padding:14px 18px;border-radius:14px;background:linear-gradient(135deg,rgba(6,182,212,0.08),rgba(59,130,246,0.08));border:2px solid rgba(6,182,212,0.25);margin-bottom:8px">';
-                headerHtml += '<div style="font-size:0.88rem;font-weight:800;color:#06b6d4;margin-bottom:6px">⚖️ 评委验证</div>';
-                headerHtml += '<div style="font-size:0.68rem;color:rgba(255,255,255,0.5)">核心声明全部有证据支撑</div>';
+                headerHtml += '<div style="font-size:0.88rem;font-weight:800;color:#0071e3;margin-bottom:6px">⚖️ 评委验证</div>';
+                headerHtml += '<div style="font-size:0.68rem;color:#636366">核心声明全部有证据支撑</div>';
                 headerHtml += '</div>';
                 addChatMsg('bot', headerHtml, { status: 'success' });
 
@@ -1524,7 +1524,7 @@
                     if (!r) continue;
                     var proven = r.proven;
 
-                    var html = '<div style="padding:12px 14px;border-radius:12px;background:rgba(0,0,0,0.15);border:1px solid ' + cc.color + '33;margin-top:6px">';
+                    var html = '<div style="padding:12px 14px;border-radius:12px;background:#e5e5ea;border:1px solid ' + cc.color + '33;margin-top:6px">';
                     html += '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">';
                     html += '<span style="font-size:0.76rem;font-weight:700;color:' + cc.color + '">' + cc.label + '</span>';
                     html += '<span style="font-size:0.55rem;padding:2px 6px;border-radius:4px;background:' + cc.color + '22;color:' + cc.color + ';font-weight:600">' + cc.tag + '</span>';
@@ -1558,7 +1558,7 @@
                         }
                         if (r.iam_integration_proof) {
                             var proof = r.iam_integration_proof;
-                            html += '<div style="font-size:0.60rem;color:rgba(255,255,255,0.4);margin-top:4px;font-family:monospace">' + proof.flow + '</div>';
+                            html += '<div style="font-size:0.60rem;color:#8e8e93;margin-top:4px;font-family:monospace">' + proof.flow + '</div>';
                         }
                     }
 
@@ -1575,9 +1575,9 @@
                     if (or2 && or2.proven) otherResults.push(otherNames[j]);
                 }
                 if (otherResults.length > 0) {
-                    var otherHtml = '<div style="padding:8px 12px;border-radius:8px;background:rgba(255,255,255,0.02);border-top:1px solid rgba(255,255,255,0.04);margin-top:6px;display:flex;gap:12px;justify-content:center;flex-wrap:wrap">';
+                    var otherHtml = '<div style="padding:8px 12px;border-radius:8px;background:#fafafa;border-top:1px solid rgba(0,0,0,0.04);margin-top:6px;display:flex;gap:12px;justify-content:center;flex-wrap:wrap">';
                     for (var k = 0; k < otherResults.length; k++) {
-                        otherHtml += '<span style="font-size:0.58rem;color:rgba(255,255,255,0.25)">✔ ' + otherResults[k] + '</span>';
+                        otherHtml += '<span style="font-size:0.58rem;color:#aeaeb2">✔ ' + otherResults[k] + '</span>';
                     }
                     otherHtml += '</div>';
                     addChatMsg('bot', otherHtml, { status: 'success' });
@@ -1611,8 +1611,8 @@
             if (idx >= attacks.length) {
                 var finalHtml = '<div style="padding:16px 20px;border-radius:14px;background:linear-gradient(135deg,rgba(239,68,68,0.08),rgba(52,211,153,0.04));border:2px solid rgba(239,68,68,0.2);margin-top:8px">';
                 finalHtml += '<div style="font-size:0.92rem;font-weight:800;color:#ef4444;margin-bottom:4px;text-align:center">结论：攻击无法绕过 IAM</div>';
-                finalHtml += '<div style="font-size:0.72rem;color:rgba(255,255,255,0.5);text-align:center;margin-bottom:10px">' + blocked + '/' + total + ' attacks blocked — 后端实时返回，非前端模拟</div>';
-                finalHtml += '<div style="padding:10px 12px;border-radius:8px;background:rgba(0,0,0,0.25);font-family:monospace;font-size:0.60rem;color:rgba(255,255,255,0.5);max-height:140px;overflow-y:auto;margin-bottom:10px">';
+                finalHtml += '<div style="font-size:0.72rem;color:#636366;text-align:center;margin-bottom:10px">' + blocked + '/' + total + ' attacks blocked — 后端实时返回，非前端模拟</div>';
+                finalHtml += '<div style="padding:10px 12px;border-radius:8px;background:#d1d1d6;font-family:monospace;font-size:0.60rem;color:#636366;max-height:140px;overflow-y:auto;margin-bottom:10px">';
                 for (var a = 0; a < auditLines.length; a++) {
                     finalHtml += '<div style="margin-bottom:2px">' + auditLines[a] + '</div>';
                 }
@@ -1621,10 +1621,10 @@
                 finalHtml += '<div style="padding:12px 16px;border-radius:10px;background:rgba(239,68,68,0.06);border:1px solid rgba(239,68,68,0.15)">';
                 finalHtml += '<div style="font-size:0.88rem;color:#ef4444;font-weight:800;text-align:center;margin-bottom:8px">攻击会改变权限结构</div>';
                 finalHtml += '<div style="display:flex;gap:12px;justify-content:center;margin-bottom:8px;flex-wrap:wrap">';
-                finalHtml += '<div style="padding:8px 12px;border-radius:8px;background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);text-align:center;flex:1;min-width:140px">';
-                finalHtml += '<div style="font-size:0.58rem;color:rgba(255,255,255,0.3);margin-bottom:4px">传统 IAM</div>';
-                finalHtml += '<div style="font-size:0.62rem;color:rgba(255,255,255,0.4);font-family:monospace">Request → Permission → Allow/Deny</div>';
-                finalHtml += '<div style="font-size:0.52rem;color:rgba(255,255,255,0.2);margin-top:4px">（请求是静态的）</div>';
+                finalHtml += '<div style="padding:8px 12px;border-radius:8px;background:#fafafa;border:1px solid rgba(0,0,0,0.06);text-align:center;flex:1;min-width:140px">';
+                finalHtml += '<div style="font-size:0.58rem;color:#8e8e93;margin-bottom:4px">传统 IAM</div>';
+                finalHtml += '<div style="font-size:0.62rem;color:#8e8e93;font-family:monospace">Request → Permission → Allow/Deny</div>';
+                finalHtml += '<div style="font-size:0.52rem;color:#c7c7cc;margin-top:4px">（请求是静态的）</div>';
                 finalHtml += '</div>';
                 finalHtml += '<div style="padding:8px 12px;border-radius:8px;background:rgba(239,68,68,0.06);border:1px solid rgba(239,68,68,0.15);text-align:center;flex:1;min-width:140px">';
                 finalHtml += '<div style="font-size:0.58rem;color:#ef4444;margin-bottom:4px">AgentPass</div>';
@@ -1632,7 +1632,7 @@
                 finalHtml += '<div style="font-size:0.52rem;color:#ef4444;margin-top:4px">（请求本身会改变权限）</div>';
                 finalHtml += '</div>';
                 finalHtml += '</div>';
-                finalHtml += '<div style="font-size:0.56rem;color:rgba(255,255,255,0.25);text-align:center;margin-top:2px">差异不是"流程更多"，而是"权限由行为动态决定"</div>';
+                finalHtml += '<div style="font-size:0.56rem;color:#aeaeb2;text-align:center;margin-top:2px">差异不是"流程更多"，而是"权限由行为动态决定"</div>';
                 finalHtml += '</div>';
 
                 finalHtml += '</div>';
@@ -1648,11 +1648,11 @@
 
             var atkHtml = '<div style="padding:12px 16px;border-radius:12px;background:rgba(239,68,68,0.06);border:1px solid rgba(239,68,68,0.2);margin-top:6px">';
             atkHtml += '<div style="font-size:0.62rem;color:#f87171;font-weight:700;letter-spacing:0.06em;margin-bottom:6px">[ATTACK] ' + atk.label + ' → ' + atk.target + '</div>';
-            atkHtml += '<div style="font-size:0.60rem;color:rgba(255,255,255,0.3);margin-left:12px;margin-bottom:2px">请求: ' + atk.input + '</div>';
-            atkHtml += '<div style="font-size:0.56rem;color:rgba(255,255,255,0.15);margin-left:12px;margin-bottom:2px">↓</div>';
-            atkHtml += '<div style="font-size:0.56rem;color:#06b6d4;margin-left:12px;margin-bottom:2px">来源: ' + atk.api + ' (真实后端)</div>';
-            atkHtml += '<div style="font-size:0.56rem;color:rgba(255,255,255,0.15);margin-left:12px;margin-bottom:2px">↓</div>';
-            atkHtml += '<div id="attackResult_' + idx + '" style="font-size:0.60rem;color:rgba(255,255,255,0.2);margin-left:12px">[IAM CHECK] ...</div>';
+            atkHtml += '<div style="font-size:0.60rem;color:#8e8e93;margin-left:12px;margin-bottom:2px">请求: ' + atk.input + '</div>';
+            atkHtml += '<div style="font-size:0.56rem;color:#d1d1d6;margin-left:12px;margin-bottom:2px">↓</div>';
+            atkHtml += '<div style="font-size:0.56rem;color:#0071e3;margin-left:12px;margin-bottom:2px">来源: ' + atk.api + ' (真实后端)</div>';
+            atkHtml += '<div style="font-size:0.56rem;color:#d1d1d6;margin-left:12px;margin-bottom:2px">↓</div>';
+            atkHtml += '<div id="attackResult_' + idx + '" style="font-size:0.60rem;color:#c7c7cc;margin-left:12px">[IAM CHECK] ...</div>';
             atkHtml += '</div>';
             addChatMsg('bot', atkHtml, { status: 'denied' });
 
@@ -1670,22 +1670,22 @@
                 var ts = now.toTimeString().split(' ')[0] + '.' + String(now.getMilliseconds()).padStart(3, '0');
 
                 if (isDenied) {
-                    auditLines.push('<span style="color:rgba(255,255,255,0.2)">[' + ts + ']</span> <span style="color:#ef4444">' + atk.label + ' → ' + atk.target + ' → DENY</span> <span style="color:rgba(255,255,255,0.3)">(' + elapsed + 'ms)</span>');
+                    auditLines.push('<span style="color:#c7c7cc">[' + ts + ']</span> <span style="color:#ef4444">' + atk.label + ' → ' + atk.target + ' → DENY</span> <span style="color:#8e8e93">(' + elapsed + 'ms)</span>');
                 }
                 if (result.blocked_at) {
                     var now2 = new Date();
                     var ts2 = now2.toTimeString().split(' ')[0] + '.' + String(now2.getMilliseconds()).padStart(3, '0');
-                    auditLines.push('<span style="color:rgba(255,255,255,0.2)">[' + ts2 + ']</span> <span style="color:#fbbf24">' + result.blocked_at + ' → BLOCKED</span>');
+                    auditLines.push('<span style="color:#c7c7cc">[' + ts2 + ']</span> <span style="color:#fbbf24">' + result.blocked_at + ' → BLOCKED</span>');
                 }
                 if (result.prompt_risk_score != null && result.prompt_risk_score > 0.5) {
                     var now3 = new Date();
                     var ts3 = now3.toTimeString().split(' ')[0] + '.' + String(now3.getMilliseconds()).padStart(3, '0');
-                    auditLines.push('<span style="color:rgba(255,255,255,0.2)">[' + ts3 + ']</span> <span style="color:#f97316">prompt_risk=' + result.prompt_risk_score.toFixed(2) + ' → TRUST ↓</span>');
+                    auditLines.push('<span style="color:#c7c7cc">[' + ts3 + ']</span> <span style="color:#f97316">prompt_risk=' + result.prompt_risk_score.toFixed(2) + ' → TRUST ↓</span>');
                 }
                 if (result.trust_score != null) {
                     var now4 = new Date();
                     var ts4 = now4.toTimeString().split(' ')[0] + '.' + String(now4.getMilliseconds()).padStart(3, '0');
-                    auditLines.push('<span style="color:rgba(255,255,255,0.2)">[' + ts4 + ']</span> <span style="color:#8b5cf6">trust_score=' + result.trust_score.toFixed(2) + '</span>');
+                    auditLines.push('<span style="color:#c7c7cc">[' + ts4 + ']</span> <span style="color:#8b5cf6">trust_score=' + result.trust_score.toFixed(2) + '</span>');
                 }
 
                 var resultEl = document.getElementById('attackResult_' + idx);
@@ -1715,7 +1715,7 @@
                 var elapsed = Date.now() - atkStartMs;
                 var now = new Date();
                 var ts = now.toTimeString().split(' ')[0] + '.' + String(now.getMilliseconds()).padStart(3, '0');
-                auditLines.push('<span style="color:rgba(255,255,255,0.2)">[' + ts + ']</span> <span style="color:#ef4444">' + atk.label + ' → IAM_CHECK_FAILED</span> <span style="color:rgba(255,255,255,0.3)">(' + elapsed + 'ms)</span>');
+                auditLines.push('<span style="color:#c7c7cc">[' + ts + ']</span> <span style="color:#ef4444">' + atk.label + ' → IAM_CHECK_FAILED</span> <span style="color:#8e8e93">(' + elapsed + 'ms)</span>');
 
                 var resultEl = document.getElementById('attackResult_' + idx);
                 if (resultEl) {
@@ -1732,7 +1732,7 @@
 
         var headerHtml = '<div style="padding:14px 18px;border-radius:14px;background:linear-gradient(135deg,rgba(239,68,68,0.1),rgba(220,38,38,0.08));border:2px solid rgba(239,68,68,0.3);margin-bottom:8px">';
         headerHtml += '<div style="font-size:0.92rem;font-weight:800;color:#ef4444;margin-bottom:4px;text-align:center">⚔️ 运行真实攻击测试</div>';
-        headerHtml += '<div style="font-size:0.60rem;color:rgba(255,255,255,0.3);text-align:center">调用后端 API，非前端模拟</div>';
+        headerHtml += '<div style="font-size:0.60rem;color:#8e8e93;text-align:center">调用后端 API，非前端模拟</div>';
         headerHtml += '</div>';
         addChatMsg('bot', headerHtml, { status: 'success' });
 
@@ -1755,7 +1755,7 @@
                     var p = problems[i];
                     var numColor = i === 2 ? '#ef4444' : '#06b6d4';
                     var solColor = i === 2 ? '#ef4444' : '#34d399';
-                    html += '<div style="padding:10px 14px;margin-bottom:8px;border-radius:10px;background:rgba(0,0,0,0.25);border-left:3px solid ' + numColor + '">';
+                    html += '<div style="padding:10px 14px;margin-bottom:8px;border-radius:10px;background:#d1d1d6;border-left:3px solid ' + numColor + '">';
                     html += '<div style="font-size:0.72rem;color:#94a3b8;margin-bottom:4px">' + p.problem_cn + '</div>';
                     html += '<div style="font-size:0.8rem;color:' + solColor + ';font-weight:800">→ ' + p.solution_cn + '</div>';
                     html += '</div>';
@@ -1768,17 +1768,17 @@
                 html += '<div style="font-size:0.76rem;color:#fbbf24;font-family:monospace;text-align:center;margin-bottom:4px;font-weight:700;letter-spacing:0.08em">' + data.flow + '</div>';
 
                 var claims = data.three_core_claims || [];
-                html += '<div style="margin-top:16px;padding-top:14px;border-top:1px solid rgba(255,255,255,0.06)">';
-                html += '<div style="font-size:0.78rem;font-weight:700;color:rgba(255,255,255,0.6);margin-bottom:12px;text-align:center">三个核心声明</div>';
+                html += '<div style="margin-top:16px;padding-top:14px;border-top:1px solid rgba(0,0,0,0.06)">';
+                html += '<div style="font-size:0.78rem;font-weight:700;color:#48484a;margin-bottom:12px;text-align:center">三个核心声明</div>';
 
                 var claimColors = ['#ef4444', '#8b5cf6', '#f97316'];
                 var claimBgColors = ['rgba(239,68,68,0.08)', 'rgba(139,92,246,0.08)', 'rgba(249,115,22,0.08)'];
                 var claimBorderColors = ['rgba(239,68,68,0.25)', 'rgba(139,92,246,0.25)', 'rgba(249,115,22,0.25)'];
                 var claimLabels = ['最硬', '架构级', '核心创新'];
                 var claimReproduce = [
-                    '<span style="color:rgba(255,255,255,0.25)">[运行测试]</span> <span style="color:#06b6d4;font-family:monospace">scripts/attack_bypass_test.py</span>',
-                    '<span style="color:rgba(255,255,255,0.25)">[运行测试]</span> <span style="color:#06b6d4;font-family:monospace">scripts/attack_bypass_test.py Test [7]</span>',
-                    '<span style="color:rgba(255,255,255,0.25)">[查看验证]</span> <span style="color:#06b6d4;font-family:monospace">/api/p2/judge/verify-all → q3_prompt_is_iam</span>',
+                    '<span style="color:#aeaeb2">[运行测试]</span> <span style="color:#0071e3;font-family:monospace">scripts/attack_bypass_test.py</span>',
+                    '<span style="color:#aeaeb2">[运行测试]</span> <span style="color:#0071e3;font-family:monospace">scripts/attack_bypass_test.py Test [7]</span>',
+                    '<span style="color:#aeaeb2">[查看验证]</span> <span style="color:#0071e3;font-family:monospace">/api/p2/judge/verify-all → q3_prompt_is_iam</span>',
                 ];
 
                 for (var c = 0; c < claims.length; c++) {
@@ -1798,53 +1798,53 @@
                         var item = items[e];
                         var isBlocked = item.result.indexOf('DENIED') >= 0 || item.result.indexOf('REJECTED') >= 0 || item.result.indexOf('0.00') >= 0 || item.result.indexOf('0.65') >= 0;
 
-                        html += '<div style="margin-bottom:8px;padding:8px 10px;border-radius:8px;background:rgba(0,0,0,0.2)">';
+                        html += '<div style="margin-bottom:8px;padding:8px 10px;border-radius:8px;background:#f5f5f7">';
                         html += '<div style="font-size:0.62rem;color:#f87171;font-weight:700;letter-spacing:0.04em;margin-bottom:4px">[ATTACK] ' + item.attack + '</div>';
-                        html += '<div style="font-size:0.58rem;color:rgba(255,255,255,0.25);margin-left:12px;margin-bottom:2px">↓</div>';
+                        html += '<div style="font-size:0.58rem;color:#aeaeb2;margin-left:12px;margin-bottom:2px">↓</div>';
 
                         if (c === 0) {
-                            html += '<div style="font-size:0.62rem;color:#06b6d4;font-weight:600;margin-left:12px;margin-bottom:2px">[IAM CHECK]</div>';
-                            html += '<div style="font-size:0.58rem;color:rgba(255,255,255,0.25);margin-left:12px;margin-bottom:2px">↓</div>';
+                            html += '<div style="font-size:0.62rem;color:#0071e3;font-weight:600;margin-left:12px;margin-bottom:2px">[IAM CHECK]</div>';
+                            html += '<div style="font-size:0.58rem;color:#aeaeb2;margin-left:12px;margin-bottom:2px">↓</div>';
                             html += '<div style="font-size:0.62rem;color:#ef4444;font-weight:700;margin-left:12px">[RESULT] ' + item.result_cn + '</div>';
                         } else if (c === 1) {
                             html += '<div style="font-size:0.62rem;color:#8b5cf6;font-weight:600;margin-left:12px;margin-bottom:2px">[SIGNATURE VERIFY]</div>';
-                            html += '<div style="font-size:0.58rem;color:rgba(255,255,255,0.25);margin-left:12px;margin-bottom:2px">↓</div>';
+                            html += '<div style="font-size:0.58rem;color:#aeaeb2;margin-left:12px;margin-bottom:2px">↓</div>';
                             html += '<div style="font-size:0.62rem;color:#ef4444;font-weight:700;margin-left:12px">[RESULT] ' + item.result_cn + '</div>';
                         } else {
                             html += '<div style="font-size:0.62rem;color:#f97316;font-weight:600;margin-left:12px;margin-bottom:2px">[RISK → TRUST → CAPABILITY]</div>';
-                            html += '<div style="font-size:0.58rem;color:rgba(255,255,255,0.25);margin-left:12px;margin-bottom:2px">↓</div>';
+                            html += '<div style="font-size:0.58rem;color:#aeaeb2;margin-left:12px;margin-bottom:2px">↓</div>';
                             html += '<div style="font-size:0.62rem;color:' + (isBlocked ? '#ef4444' : '#34d399') + ';font-weight:700;margin-left:12px">[RESULT] ' + item.result_cn + '</div>';
                         }
 
                         html += '</div>';
                     }
 
-                    html += '<div style="font-size:0.72rem;color:' + clColor + ';font-weight:800;margin-top:8px;text-align:center;padding:6px 10px;background:rgba(0,0,0,0.15);border-radius:6px">' + cl.conclusion_cn + '</div>';
-                    html += '<div style="font-size:0.56rem;margin-top:6px;padding-top:4px;border-top:1px solid rgba(255,255,255,0.04);text-align:center">' + claimReproduce[c] + '</div>';
+                    html += '<div style="font-size:0.72rem;color:' + clColor + ';font-weight:800;margin-top:8px;text-align:center;padding:6px 10px;background:#e5e5ea;border-radius:6px">' + cl.conclusion_cn + '</div>';
+                    html += '<div style="font-size:0.56rem;margin-top:6px;padding-top:4px;border-top:1px solid rgba(0,0,0,0.04);text-align:center">' + claimReproduce[c] + '</div>';
                     html += '</div>';
                 }
 
                 html += '</div>';
 
-                html += '<div style="margin-top:12px;padding:8px 14px;border-radius:8px;background:rgba(255,255,255,0.02);border-top:1px solid rgba(255,255,255,0.04);display:flex;justify-content:center;gap:16px;flex-wrap:wrap">';
+                html += '<div style="margin-top:12px;padding:8px 14px;border-radius:8px;background:#fafafa;border-top:1px solid rgba(0,0,0,0.04);display:flex;justify-content:center;gap:16px;flex-wrap:wrap">';
                 var sup = data.supplementary || {};
-                if (sup.standard_alignment_cn) { html += '<span style="font-size:0.6rem;color:rgba(255,255,255,0.3)">✔ ' + sup.standard_alignment_cn + '</span>'; }
-                if (sup.hitl_cn) { html += '<span style="font-size:0.6rem;color:rgba(255,255,255,0.3)">✔ ' + sup.hitl_cn + '</span>'; }
-                if (sup.performance_cn) { html += '<span style="font-size:0.6rem;color:rgba(255,255,255,0.3)">✔ ' + sup.performance_cn + '</span>'; }
+                if (sup.standard_alignment_cn) { html += '<span style="font-size:0.6rem;color:#8e8e93">✔ ' + sup.standard_alignment_cn + '</span>'; }
+                if (sup.hitl_cn) { html += '<span style="font-size:0.6rem;color:#8e8e93">✔ ' + sup.hitl_cn + '</span>'; }
+                if (sup.performance_cn) { html += '<span style="font-size:0.6rem;color:#8e8e93">✔ ' + sup.performance_cn + '</span>'; }
                 html += '</div>';
 
-                html += '<div style="margin-top:10px;padding:10px 14px;border-radius:8px;background:rgba(255,255,255,0.01);border-top:1px solid rgba(255,255,255,0.03)">';
-                html += '<div style="font-size:0.56rem;color:rgba(255,255,255,0.2);margin-bottom:4px;font-weight:600">系统边界（工程声明）</div>';
-                html += '<div style="font-size:0.54rem;color:rgba(255,255,255,0.18);margin-bottom:2px">适用：</div>';
-                html += '<div style="font-size:0.54rem;color:rgba(255,255,255,0.18);margin-bottom:2px">- 多 Agent 委派调用链（A → B → C）</div>';
-                html += '<div style="font-size:0.54rem;color:rgba(255,255,255,0.18);margin-bottom:2px">- 所有请求经过 IAM Gateway</div>';
-                html += '<div style="font-size:0.54rem;color:rgba(255,255,255,0.18);margin-bottom:6px">- 使用签名委派 Token（逐跳验证）</div>';
-                html += '<div style="font-size:0.54rem;color:rgba(255,255,255,0.18);margin-bottom:2px">不覆盖：</div>';
-                html += '<div style="font-size:0.54rem;color:rgba(255,255,255,0.18);margin-bottom:2px">- 单 Agent 本地执行（无身份传播）</div>';
-                html += '<div style="font-size:0.54rem;color:rgba(255,255,255,0.18);margin-bottom:2px">- Agent 内部逻辑漏洞（非身份问题）</div>';
-                html += '<div style="font-size:0.54rem;color:rgba(255,255,255,0.18);margin-bottom:6px">- 非 Token 通道调用（绕过接入层）</div>';
-                html += '<div style="font-size:0.56rem;color:rgba(255,255,255,0.22);margin-bottom:4px;font-weight:600">结论：本系统保证"身份与权限不可被外部绕过"，不保证"业务逻辑绝对安全"</div>';
-                html += '<div style="font-size:0.52rem;color:rgba(255,255,255,0.15)">该边界可通过攻击测试脚本复现验证</div>';
+                html += '<div style="margin-top:10px;padding:10px 14px;border-radius:8px;background:#fcfcfc;border-top:1px solid rgba(0,0,0,0.03)">';
+                html += '<div style="font-size:0.56rem;color:#c7c7cc;margin-bottom:4px;font-weight:600">系统边界（工程声明）</div>';
+                html += '<div style="font-size:0.54rem;color:#c7c7cc;margin-bottom:2px">适用：</div>';
+                html += '<div style="font-size:0.54rem;color:#c7c7cc;margin-bottom:2px">- 多 Agent 委派调用链（A → B → C）</div>';
+                html += '<div style="font-size:0.54rem;color:#c7c7cc;margin-bottom:2px">- 所有请求经过 IAM Gateway</div>';
+                html += '<div style="font-size:0.54rem;color:#c7c7cc;margin-bottom:6px">- 使用签名委派 Token（逐跳验证）</div>';
+                html += '<div style="font-size:0.54rem;color:#c7c7cc;margin-bottom:2px">不覆盖：</div>';
+                html += '<div style="font-size:0.54rem;color:#c7c7cc;margin-bottom:2px">- 单 Agent 本地执行（无身份传播）</div>';
+                html += '<div style="font-size:0.54rem;color:#c7c7cc;margin-bottom:2px">- Agent 内部逻辑漏洞（非身份问题）</div>';
+                html += '<div style="font-size:0.54rem;color:#c7c7cc;margin-bottom:6px">- 非 Token 通道调用（绕过接入层）</div>';
+                html += '<div style="font-size:0.56rem;color:#aeaeb2;margin-bottom:4px;font-weight:600">结论：本系统保证"身份与权限不可被外部绕过"，不保证"业务逻辑绝对安全"</div>';
+                html += '<div style="font-size:0.52rem;color:#d1d1d6">该边界可通过攻击测试脚本复现验证</div>';
                 html += '</div>';
 
                 html += '</div>';
