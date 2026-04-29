@@ -70,7 +70,7 @@ logger = logging.getLogger("agent_system")
 _ngrok_url: str | None = None
 
 _last_ping_at: float = time.time()
-_IDLE_TIMEOUT = 120
+_IDLE_TIMEOUT = 900
 
 
 async def _idle_shutdown_watcher():
