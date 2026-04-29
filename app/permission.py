@@ -4,7 +4,7 @@ from __future__ import annotations
 ROLE_PERMISSIONS = {
     "basic": ["read_doc"],
     "editor": ["read_doc", "write_doc"],
-    "operator": ["read_doc", "execute_task", "call_api", "delegate_task"],
+    "operator": ["read_doc", "write_doc", "execute_task", "call_api", "delegate_task"],
     "admin": [
         "read_doc",
         "write_doc",
@@ -22,7 +22,17 @@ VALID_SENSITIVITIES = {"public", "internal", "confidential"}
 
 
 def check_permission(role: str, action: str) -> bool:
-    return action in ROLE_PERMISSIONS.get(role, [])
+    if action in ROLE_PERMISSIONS.get(role, []):
+        return True
+    action_parts = action.split(":")
+    if len(action_parts) >= 2:
+        underscore_action = "_".join(action_parts[:2])
+        if underscore_action in ROLE_PERMISSIONS.get(role, []):
+            return True
+    for perm in ROLE_PERMISSIONS.get(role, []):
+        if action.startswith(perm.replace("_", ":")):
+            return True
+    return False
 
 
 def list_permissions(role: str) -> list[str]:

@@ -218,7 +218,23 @@ def _execute_data_agent(action: str) -> Dict[str, Any]:
     return {"status": "success", "content": "\n".join(content_lines), "data": data, "agent": "data_agent", "action": action}
 
 
-def _execute_doc_agent(action: str) -> Dict[str, Any]:
+def _execute_doc_agent(action: str, message: str = "") -> Dict[str, Any]:
+    real_doc_url = None
+    try:
+        from app.feishu.client import get_feishu_client
+        client = get_feishu_client()
+        if client.is_configured():
+            doc_title = f"AgentPass文档 - {message[:30]}" if message else "AgentPass文档"
+            doc_result = client.create_doc(title=doc_title, content=message or "文档已创建")
+            if doc_result.get("code") == 0:
+                real_doc_url = doc_result.get("url", "")
+                logger.info("Real doc created: %s", real_doc_url)
+    except Exception as e:
+        logger.warning("Failed to create real doc: %s", e)
+
+    if real_doc_url:
+        return {"status": "success", "content": f"📄 文档已创建（飞书云文档）", "agent": "doc_agent", "action": action, "doc_url": real_doc_url}
+
     return {"status": "success", "content": "📄 文档操作完成", "agent": "doc_agent", "action": action, "doc_url": None}
 
 
@@ -284,7 +300,16 @@ def run_task(user_id: str = "", message: str = "", platform_request: PlatformReq
 
     task_type, target_action, target_agent, is_attack = _parse_intent(message)
 
-    logger.info("run_task: user=%s message='%s' platform=%s task_type=%s target_agent=%s action=%s attack=%s", user_id, message[:50], platform, task_type, target_agent, target_action, is_attack)
+    prompt_risk = _detect_prompt_risk(message)
+    risk_context["prompt_risk"] = prompt_risk["risk_score"]
+    risk_context["prompt_threats"] = prompt_risk["threats"]
+
+    if prompt_risk["risk_score"] > 0.7:
+        from app.delegation.engine import update_trust_score
+        update_trust_score("doc_agent", -0.15)
+        logger.warning("Prompt risk HIGH: score=%.2f threats=%s → trust penalty", prompt_risk["risk_score"], prompt_risk["threats"])
+
+    logger.info("run_task: user=%s message='%s' platform=%s task_type=%s target_agent=%s action=%s attack=%s prompt_risk=%.2f", user_id, message[:50], platform, task_type, target_agent, target_action, is_attack, prompt_risk["risk_score"])
 
     platform_risk = calculate_platform_risk(platform, target_action)
     risk_context["platform_risk_adjusted"] = platform_risk
@@ -327,6 +352,33 @@ def run_task(user_id: str = "", message: str = "", platform_request: PlatformReq
 
     chain = ["user:" + user_id, "doc_agent"]
 
+    six_layer_result = None
+    try:
+        from app.security.six_layer_verify import verify_six_layers
+        six_layer_result = verify_six_layers(
+            agent_id="doc_agent",
+            action=target_action,
+            input_text=message,
+            trust_score=get_trust_score("doc_agent"),
+            risk_score=prompt_risk["risk_score"],
+            role="operator",
+            delegation_chain=chain,
+        )
+        if six_layer_result.overall_status == "BLOCKED":
+            from app.delegation.engine import update_trust_score
+            update_trust_score("doc_agent", -0.1)
+            formatted = "🛡️ 六层安全验证未通过\n\n"
+            for layer in six_layer_result.layers:
+                if layer.status == "fail":
+                    formatted += f"  {layer.icon} {layer.layer_id} {layer.layer_name}: ❌ {layer.detail}\n"
+            formatted += f"\n📊 整体状态：{six_layer_result.overall_status}\n"
+            formatted += f"🔐 最终决策：{six_layer_result.final_decision}\n"
+            formatted += f"⚠️ 已记录审计日志"
+            _log_event(user_id, message, "doc_agent", target_action, "six_layer_blocked", None, {"six_layer": six_layer_result.to_dict(), "prompt_risk": prompt_risk}, platform=platform)
+            return {"status": "denied", "content": formatted, "chain": chain, "capability": target_action, "trust_score": get_trust_score("doc_agent"), "platform": platform, "six_layer": six_layer_result.to_dict(), "prompt_risk": prompt_risk}
+    except Exception as e:
+        logger.warning("Six layer verify error (non-blocking): %s", e)
+
     try:
         if target_agent == "data_agent":
             agent_result = secure_agent_call(engine=engine, token=root_token, caller_agent="doc_agent", target_agent="data_agent", action=target_action, platform=platform)
@@ -336,7 +388,7 @@ def run_task(user_id: str = "", message: str = "", platform_request: PlatformReq
                 chain_with_target = chain + ["data_agent"]
                 formatted = _format_denied(agent_result.get("human_reason", "❌ 请求被拒绝"), chain_with_target, target_action, trust)
                 _log_event(user_id, message, "data_agent", target_action, "denied", trust, {"blocked_at": agent_result.get("blocked_at"), "auto_revoked": agent_result.get("auto_revoked", False), "chain": chain_with_target, "platform_risk": platform_risk}, platform=platform)
-                return {"status": "denied", "content": formatted, "reason": agent_result.get("reason"), "chain": chain_with_target, "blocked_at": agent_result.get("blocked_at"), "auto_revoked": agent_result.get("auto_revoked", False), "capability": target_action, "trust_score": trust, "platform": platform, "platform_risk": platform_risk}
+                return {"status": "denied", "content": formatted, "reason": agent_result.get("reason"), "chain": chain_with_target, "blocked_at": agent_result.get("blocked_at"), "auto_revoked": agent_result.get("auto_revoked", False), "capability": target_action, "trust_score": trust, "platform": platform, "platform_risk": platform_risk, "six_layer": six_layer_result.to_dict() if six_layer_result else None, "prompt_risk": prompt_risk}
 
             chain.append("data_agent")
             data_result = agent_result.get("result", {})
@@ -349,7 +401,7 @@ def run_task(user_id: str = "", message: str = "", platform_request: PlatformReq
                 formatted = _format_success(user_id, data_result.get("content", "查询完成"), chain, target_action, trust, data_result.get("data"))
 
             _log_event(user_id, message, "data_agent", target_action, "success", trust, {"chain": chain, "data": data_result.get("data"), "platform_risk": platform_risk}, platform=platform)
-            return {"status": "success", "content": formatted, "chain": chain, "data": data_result.get("data"), "capability": target_action, "trust_score": trust, "platform": platform, "platform_risk": platform_risk}
+            return {"status": "success", "content": formatted, "chain": chain, "data": data_result.get("data"), "capability": target_action, "trust_score": trust, "platform": platform, "platform_risk": platform_risk, "six_layer": six_layer_result.to_dict() if six_layer_result else None, "prompt_risk": prompt_risk}
 
         elif target_agent == "doc_agent":
             check_result = engine.check(token=root_token, action=target_action, caller_agent="doc_agent")
@@ -357,13 +409,13 @@ def run_task(user_id: str = "", message: str = "", platform_request: PlatformReq
                 doc_trust = get_trust_score("doc_agent")
                 formatted = _format_denied(_humanize_block("check", check_result.reason, "doc_agent", check_result.auto_revoked), chain, target_action, doc_trust)
                 _log_event(user_id, message, "doc_agent", target_action, "denied", doc_trust, {"auto_revoked": check_result.auto_revoked, "platform_risk": platform_risk}, platform=platform)
-                return {"status": "denied", "content": formatted, "reason": check_result.reason, "chain": chain, "auto_revoked": check_result.auto_revoked, "capability": target_action, "trust_score": doc_trust, "platform": platform, "platform_risk": platform_risk}
+                return {"status": "denied", "content": formatted, "reason": check_result.reason, "chain": chain, "auto_revoked": check_result.auto_revoked, "capability": target_action, "trust_score": doc_trust, "platform": platform, "platform_risk": platform_risk, "six_layer": six_layer_result.to_dict() if six_layer_result else None, "prompt_risk": prompt_risk}
 
-            doc_result = _execute_doc_agent(target_action)
+            doc_result = _execute_doc_agent(target_action, message)
             doc_trust = get_trust_score("doc_agent")
             formatted = _format_success(user_id, doc_result.get("content", "文档操作完成"), chain, target_action, doc_trust)
             _log_event(user_id, message, "doc_agent", target_action, "success", doc_trust, {"platform_risk": platform_risk}, platform=platform)
-            return {"status": "success", "content": formatted, "chain": chain, "capability": target_action, "trust_score": doc_trust, "platform": platform, "platform_risk": platform_risk}
+            return {"status": "success", "content": formatted, "chain": chain, "capability": target_action, "trust_score": doc_trust, "platform": platform, "platform_risk": platform_risk, "six_layer": six_layer_result.to_dict() if six_layer_result else None, "prompt_risk": prompt_risk, "doc_url": doc_result.get("doc_url")}
 
         else:
             agent_result = secure_agent_call(engine=engine, token=root_token, caller_agent="doc_agent", target_agent=target_agent, action=target_action, platform=platform)
@@ -373,11 +425,11 @@ def run_task(user_id: str = "", message: str = "", platform_request: PlatformReq
                 chain_with_target = chain + [target_agent]
                 formatted = _format_denied(agent_result.get("human_reason", "❌ 请求被拒绝"), chain_with_target, target_action, trust)
                 _log_event(user_id, message, target_agent, target_action, "denied", trust, {"auto_revoked": agent_result.get("auto_revoked", False), "platform_risk": platform_risk}, platform=platform)
-                return {"status": "denied", "content": formatted, "reason": agent_result.get("reason"), "chain": chain_with_target, "auto_revoked": agent_result.get("auto_revoked", False), "capability": target_action, "trust_score": trust, "platform": platform, "platform_risk": platform_risk}
+                return {"status": "denied", "content": formatted, "reason": agent_result.get("reason"), "chain": chain_with_target, "auto_revoked": agent_result.get("auto_revoked", False), "capability": target_action, "trust_score": trust, "platform": platform, "platform_risk": platform_risk, "six_layer": six_layer_result.to_dict() if six_layer_result else None, "prompt_risk": prompt_risk}
 
             formatted = _format_success(user_id, agent_result.get("result", {}).get("content", "操作完成"), chain + [target_agent], target_action, agent_result.get("trust_score"))
             _log_event(user_id, message, target_agent, target_action, "success", agent_result.get("trust_score"), {"platform_risk": platform_risk}, platform=platform)
-            return {"status": "success", "content": formatted, "chain": chain + [target_agent], "capability": target_action, "trust_score": agent_result.get("trust_score"), "platform": platform, "platform_risk": platform_risk}
+            return {"status": "success", "content": formatted, "chain": chain + [target_agent], "capability": target_action, "trust_score": agent_result.get("trust_score"), "platform": platform, "platform_risk": platform_risk, "six_layer": six_layer_result.to_dict() if six_layer_result else None, "prompt_risk": prompt_risk}
 
     except Exception as e:
         logger.error("run_task execution error: %s", e, exc_info=True)
@@ -539,6 +591,41 @@ def _handle_auto_revoke_attack(user_id: str, message: str, engine: DelegationEng
 
     _log_event(user_id, message, "external_agent", "multi_attack", "denied", None, {"attack_type": "auto_revoke", "steps": steps}, platform=platform)
     return {"status": "denied", "content": formatted, "chain": chain, "steps": steps, "capability": "multiple", "trust_score": None, "attack_type": "auto_revoke", "platform": platform}
+
+
+def _detect_prompt_risk(message: str) -> Dict[str, Any]:
+    import re
+    threats = []
+    risk_score = 0.0
+
+    injection_patterns = [
+        ("ignore_previous", r"(?i)(ignore|忽略).*(previous|之前的|above|上述).*(instruction|指令|rules|规则)", 0.4),
+        ("role_escape", r"(?i)(you are|你是|act as|扮演).*(admin|管理员|root|superuser|超级用户)", 0.5),
+        ("data_exfil", r"(?i)(export|导出|download|下载|send to|发送到).*(all|所有|complete|完整).*(data|数据)", 0.4),
+        ("system_prompt", r"(?i)(system prompt|系统提示|reveal|显示|show|展示).*(prompt|提示|instruction|指令)", 0.5),
+        ("jailbreak", r"(?i)(jailbreak|越狱|DAN|do anything now)", 0.6),
+        ("privilege_escalation", r"(?i)(给我管理员|提升权限|privilege|escalate|bypass|绕过)", 0.5),
+        ("indirect_injection", r"(?i)(forget|忘记).*(previous|之前的|above|上述).*(instruction|指令)", 0.35),
+        ("social_engineering", r"(?i)(紧急|urgent|immediately|立即|马上).*(执行|execute|run|运行)", 0.3),
+    ]
+
+    for threat_name, pattern, weight in injection_patterns:
+        if re.search(pattern, message):
+            threats.append(threat_name)
+            risk_score += weight
+
+    risk_score = min(1.0, risk_score)
+
+    if not threats:
+        msg_lower = message.lower()
+        sensitive_keywords = ["机密", "绝密", "confidential", "classified", "secret", "薪资", "salary", "工资"]
+        for kw in sensitive_keywords:
+            if kw in msg_lower:
+                risk_score = max(risk_score, 0.3)
+                threats.append(f"sensitive_keyword:{kw}")
+                break
+
+    return {"risk_score": risk_score, "threats": threats, "threat_count": len(threats)}
 
 
 def _parse_intent(message: str) -> tuple:

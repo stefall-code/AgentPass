@@ -151,13 +151,23 @@ def evaluate_policy(
                 })
 
     if not matched_rules:
-        result = {
-            "decision": "deny",
-            "reason": "No matching policy rule found — default deny",
-            "matched_rules": [],
-            "agent_id": agent_id,
-            "action": action,
-        }
+        from app.permission import check_permission
+        if check_permission(context.get("role", "operator"), action):
+            result = {
+                "decision": "allow",
+                "reason": "RBAC fallback: role-based permission",
+                "matched_rules": [{"policy": "rbac_fallback", "effect": "allow", "reason": "role has permission"}],
+                "agent_id": agent_id,
+                "action": action,
+            }
+        else:
+            result = {
+                "decision": "deny",
+                "reason": "No matching policy rule found — default deny",
+                "matched_rules": [],
+                "agent_id": agent_id,
+                "action": action,
+            }
     else:
         matched_rules.sort(key=lambda r: r["priority"], reverse=True)
         highest = matched_rules[0]
