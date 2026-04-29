@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿var FS = (function() {
+﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿var FS = (function() {
     var BASE = '/api/feishu';
     var DELEGATE_BASE = '/api/delegate';
     var GOV_BASE = '/api/governance';
@@ -729,30 +729,49 @@
 
             fetchJSON(step.url, opts)
                 .then(function(data) {
-                    var status = data.status || data.result || 'unknown';
-                    var isDenied = status === 'denied' || status === 'blocked' || (data.results && data.results.some(function(r) { return !r.allowed; }));
-                    var isRevoked = status === 'auto_revoked' || (data.summary && data.summary.indexOf('auto-revok') >= 0);
+                    var status = data.status || 'unknown';
+                    var isRevoked = status === 'auto_revoked';
+                    var isDenied = status === 'denied' || status === 'blocked' || (data.blocked_at != null);
                     var isAllowed = !isDenied && !isRevoked;
 
                     var icon = isRevoked ? '🔥' : (isDenied ? '🛡️' : '✅');
                     var color = isRevoked ? '#ef4444' : (isDenied ? '#a78bfa' : '#34d399');
+                    var label = isRevoked ? 'AUTO-REVOKED' : (isDenied ? 'DENIED' : 'ALLOWED');
 
-                    var html = '<div style="font-size:0.78rem;font-weight:700;color:' + color + ';margin-bottom:6px">' + icon + ' ' + step.title + '</div>';
+                    var html = '<div style="font-size:0.82rem;font-weight:700;color:' + color + ';margin-bottom:8px">' + icon + ' ' + step.title + ' — ' + label + '</div>';
 
-                    if (data.results) {
-                        for (var i = 0; i < data.results.length; i++) {
-                            var r = data.results[i];
-                            var rIcon = r.allowed ? '✅' : '❌';
-                            var rColor = r.allowed ? '#34d399' : '#ef4444';
-                            html += '<div style="font-size:0.68rem;color:' + rColor + ';margin-bottom:2px">' + rIcon + ' ' + (r.agent_id || r.agent || '') + ' → ' + (r.action || r.capability || '') + ': ' + (r.allowed ? 'ALLOWED' : 'BLOCKED') + '</div>';
+                    if (step.expect === 'allow' && data.chain) {
+                        html += '<div style="font-size:0.72rem;color:#34d399;margin-bottom:4px">正常请求通过 IAM 全链路验证</div>';
+                        html += '<div style="font-size:0.65rem;color:rgba(255,255,255,0.3);font-family:monospace">' + data.chain.join(' → ') + '</div>';
+                        if (data.trust_score != null) {
+                            html += '<div style="font-size:0.65rem;color:#34d399;margin-top:2px">Trust: ' + data.trust_score.toFixed(2) + '</div>';
+                            updateTrust(data.trust_score);
+                        }
+                    } else if (step.expect === 'deny' && data.first_call) {
+                        html += '<div style="font-size:0.72rem;color:#34d399;margin-bottom:4px">第1次请求: ' + (data.first_call.allowed ? 'ALLOWED' : 'BLOCKED') + '</div>';
+                        html += '<div style="font-size:0.72rem;color:#ef4444;margin-bottom:4px">重放请求: ' + (data.replay_call && data.replay_call.allowed ? 'ALLOWED' : 'BLOCKED') + ' — Token 已被标记为已使用</div>';
+                        if (data.chain) {
+                            html += '<div style="font-size:0.65rem;color:rgba(255,255,255,0.3);font-family:monospace;margin-top:4px">' + data.chain.join(' → ') + '</div>';
+                        }
+                    } else if (step.expect === 'deny' && data.blocked_at) {
+                        html += '<div style="font-size:0.72rem;color:#ef4444;margin-bottom:4px">越权访问被 IAM 拦截</div>';
+                        html += '<div style="font-size:0.65rem;color:rgba(255,255,255,0.4)">拦截点: ' + data.blocked_at + '</div>';
+                        if (data.chain) {
+                            html += '<div style="font-size:0.65rem;color:rgba(255,255,255,0.3);font-family:monospace;margin-top:4px">' + data.chain.join(' → ') + '</div>';
+                        }
+                    } else if (step.expect === 'revoke' && data.steps) {
+                        for (var si = 0; si < data.steps.length; si++) {
+                            var s = data.steps[si];
+                            var sIcon = s.status === 'auto_revoked' ? '🔥' : (s.status === 'denied' ? '❌' : '⚠️');
+                            var sColor = s.status === 'auto_revoked' ? '#ef4444' : (s.status === 'denied' ? '#ef4444' : '#fbbf24');
+                            html += '<div style="font-size:0.68rem;color:' + sColor + ';margin-bottom:3px">' + sIcon + ' ' + (s.message || s.action || 'Step ' + (si+1)) + ': ' + s.status + '</div>';
+                        }
+                        html += '<div style="font-size:0.72rem;color:#ef4444;font-weight:700;margin-top:6px">Agent 被自动封禁</div>';
+                        if (data.chain) {
+                            html += '<div style="font-size:0.65rem;color:rgba(255,255,255,0.3);font-family:monospace;margin-top:4px">' + data.chain.join(' → ') + '</div>';
                         }
                     } else {
-                        html += '<div style="font-size:0.7rem;color:rgba(255,255,255,0.6)">' + (data.decision || data.summary || status) + '</div>';
-                    }
-
-                    if (data.trust_score != null) {
-                        html += '<div style="font-size:0.65rem;color:rgba(255,255,255,0.4);margin-top:4px">Trust: ' + data.trust_score.toFixed(2) + '</div>';
-                        updateTrust(data.trust_score);
+                        html += '<div style="font-size:0.72rem;color:rgba(255,255,255,0.5)">' + (data.content || status) + '</div>';
                     }
 
                     addChatMsg('bot', html, { status: isAllowed ? 'success' : (isRevoked ? 'auto_revoked' : 'denied') });
