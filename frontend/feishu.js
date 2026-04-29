@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿var FS = (function() {
+﻿﻿﻿﻿﻿﻿﻿var FS = (function() {
     var BASE = '/api/feishu';
     var DELEGATE_BASE = '/api/delegate';
     var GOV_BASE = '/api/governance';
@@ -9,7 +9,11 @@
 
     function fetchJSON(url, opts) {
         opts = opts || {};
-        return fetch(url, Object.assign({}, opts, { headers: Object.assign({ 'Content-Type': 'application/json' }, opts.headers || {}) })).then(function(r) { return r.json(); });
+        var controller = new AbortController();
+        var timeout = setTimeout(function() { controller.abort(); }, 30000);
+        return fetch(url, Object.assign({}, opts, { signal: controller.signal, headers: Object.assign({ 'Content-Type': 'application/json' }, opts.headers || {}) }))
+            .then(function(r) { clearTimeout(timeout); return r.json(); })
+            .catch(function(e) { clearTimeout(timeout); throw e; });
     }
 
     function getSecurityTag(status, attackType, action) {
@@ -505,16 +509,42 @@
     var _autoConnected = false;
 
     function _autoConnect() {
-        fetchJSON(BASE + '/status')
-            .then(function(status) {
-                if (status.ngrok_active || status.public_url) {
-                    _onConnected(status.public_url, status.webhook_url, status.mode === 'production', true);
-                    return;
+        var btn = document.getElementById('btnConnect');
+        if (btn) { btn.textContent = '⏳ 自动连接中...'; btn.disabled = true; }
+        fetchJSON(BASE + '/connect', { method: 'POST' })
+            .then(function(data) {
+                var ngrokUrl = data.ngrok_url || '';
+                var connected = data.connected;
+                var tokenOk = data.token_ok;
+                var ngrokStarted = data.ngrok_started;
+
+                if (ngrokUrl) {
+                    _onConnected(ngrokUrl, data.webhook_url, connected, true);
+                } else {
+                    _onConnected('', '', false, true);
+                    var modeEl = document.getElementById('statMode');
+                    if (modeEl) { modeEl.textContent = 'MOCK'; modeEl.style.color = '#fbbf24'; }
+                    if (btn) {
+                        btn.textContent = '🚀 连接';
+                        btn.disabled = false;
+                        btn.style.background = '';
+                        btn.style.color = '';
+                        btn.style.border = '';
+                    }
                 }
-                _doConnect(true);
             })
             .catch(function() {
-                _doConnect(true);
+                _onConnected('', '', false, true);
+                var modeEl = document.getElementById('statMode');
+                if (modeEl) { modeEl.textContent = 'MOCK'; modeEl.style.color = '#fbbf24'; }
+                var btn = document.getElementById('btnConnect');
+                if (btn) {
+                    btn.textContent = '🚀 连接';
+                    btn.disabled = false;
+                    btn.style.background = '';
+                    btn.style.color = '';
+                    btn.style.border = '';
+                }
             });
     }
 
