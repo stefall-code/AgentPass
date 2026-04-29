@@ -1,4 +1,4 @@
-﻿﻿var CP = (function() {
+﻿﻿﻿var CP = (function() {
     var BASE = '/api/delegate';
     var WS_BASE = location.protocol === 'https:' ? 'wss:' : 'ws:';
 

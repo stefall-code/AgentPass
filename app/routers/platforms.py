@@ -1,4 +1,4 @@
-﻿from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import FileResponse
 from typing import List, Dict, Any
 from pydantic import BaseModel

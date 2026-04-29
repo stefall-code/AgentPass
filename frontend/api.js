@@ -1,4 +1,4 @@
-﻿const BASE = '';
+const BASE = '';
 
 export async function request(method, path, options = {}) {
   const { headers = {}, body, params } = options;

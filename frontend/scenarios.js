@@ -1,4 +1,4 @@
-﻿// 场景执行模块 - 结构化测试框架
+// 场景执行模块 - 结构化测试框架
 // 每个场景有明确的测试目标、预期结果和通过/失败判定
 import { loginAgent, batchLogin, getAgentInfo, introspectToken, readDocument, writeDocument, executeTask, callIntegration, delegateTask, getAgents, resetDemo, authFetch } from '/static/api.js';
 import state, { setActiveSession, upsertSession, addTimelineEntry, getAdminSession, setTestResult } from '/static/state.js';

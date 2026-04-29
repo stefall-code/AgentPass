@@ -1,4 +1,4 @@
-﻿const STORAGE_KEY = 'iam_sessions';
+const STORAGE_KEY = 'iam_sessions';
 const ACTIVE_KEY = 'iam_active_id';
 
 export const state = {

@@ -1,4 +1,4 @@
-﻿# AgentPass v2.5 — AI Agent 安全治理平台
+# AgentPass v2.5 — AI Agent 安全治理平台
 
 > JWT authentication, RBAC/ABAC policy engine, prompt injection defense, real-time audit, risk auto-lock, cross-platform governance, explainable IAM, Feishu security gateway
 

@@ -1,4 +1,4 @@
-﻿// 渲染模块
+// 渲染模块
 import { escapeHtml } from '/static/utils.js';
 import state, { getOrderedSessionIds, getTestSummary } from '/static/state.js';
 
