@@ -1,4 +1,4 @@
-﻿﻿var APP_MODE = (function() {
+﻿﻿﻿﻿var APP_MODE = (function() {
     var _mode = 'real';
 
     function init() {

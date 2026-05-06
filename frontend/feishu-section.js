@@ -1,4 +1,4 @@
-﻿﻿(function() {
+﻿﻿﻿﻿(function() {
     var BASE = '/api/feishu';
     var userId = 'feishu_demo_' + Math.random().toString(36).substring(2, 6);
     var counts = { events: 0, denied: 0 };

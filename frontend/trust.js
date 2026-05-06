@@ -1,4 +1,4 @@
-﻿﻿var TE = (function() {
+﻿﻿﻿﻿var TE = (function() {
     var BASE = '/api/delegate';
 
     var canvas = document.getElementById('fieldCanvas');
