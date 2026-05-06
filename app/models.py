@@ -114,6 +114,25 @@ class AgentReputationRow(Base):
     history_json = Column(Text, nullable=True, default="[]")
 
 
+class Ed25519KeyRow(Base):
+    __tablename__ = "ed25519_keys"
+    agent_id = Column(String, primary_key=True, index=True)
+    public_key_b64 = Column(String, nullable=False)
+    public_key_fingerprint = Column(String, nullable=False)
+    registered_at = Column(String, nullable=False)
+    auth_count = Column(Integer, nullable=False, default=0)
+    last_auth = Column(String, nullable=True)
+
+
+class TokenRevocationRow(Base):
+    __tablename__ = "token_revocations"
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    revoke_type = Column(String, nullable=False, index=True)
+    revoke_key = Column(String, nullable=False, index=True)
+    reason = Column(Text, nullable=True)
+    created_at = Column(String, nullable=False)
+
+
 # Pydantic 模型
 class OpenClawRequestRow(BaseModel):
     id: int = Field(default=None)

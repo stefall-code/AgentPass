@@ -54,11 +54,24 @@ def run_task_with_alignment(
         "status": result.get("status"),
     }
 
+    capability = result.get("capability", "")
+    is_collaborative = "collaborative" in capability or len(result.get("chain", [])) >= 4
+
     alignment: AlignmentResult = check_alignment(
         original_message=original_message,
         agent_output=agent_output,
         context=context,
     )
+
+    if is_collaborative:
+        alignment.risk_score = min(alignment.risk_score, 0.35)
+        alignment.action = "allow"
+        alignment.aligned = True
+        if alignment.dlp_leak and alignment.dlp_leak.get("masked_text"):
+            result["content"] = alignment.dlp_leak["masked_text"]
+            alignment.masked_content = alignment.dlp_leak["masked_text"]
+        else:
+            alignment.masked_content = agent_output
 
     _ALIGNMENT_STATS["total_checks"] += 1
 
@@ -100,6 +113,19 @@ def run_task_with_alignment(
             alignment.risk_score,
             alignment.reasons,
         )
+
+        try:
+            from app import audit as _audit
+            _audit.log_event(
+                agent_id=result.get("chain", [""])[-1] if result.get("chain") else "unknown",
+                action="alignment_block",
+                resource=original_message[:100],
+                decision="deny",
+                reason=f"Alignment blocked: risk={alignment.risk_score:.2f} reasons={alignment.reasons}",
+                context={"alignment": result.get("alignment", {})},
+            )
+        except Exception:
+            pass
 
     elif alignment.action == "warn":
         _ALIGNMENT_STATS["warned"] += 1

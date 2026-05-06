@@ -495,6 +495,7 @@ export function renderAuditTable(items) {
         <tr>
           <th>time</th>
           <th>agent</th>
+          <th>delegation chain</th>
           <th>action</th>
           <th>resource</th>
           <th>decision</th>
@@ -504,16 +505,32 @@ export function renderAuditTable(items) {
       <tbody>
         ${items
           .map(
-            (item) => `
+            (item) => {
+              const ctx = item.context || {};
+              const dChain = ctx.delegation_chain || ctx.chain || item.chain || [];
+              let chainHtml = '—';
+              if (dChain && dChain.length > 0) {
+                chainHtml = dChain.map(c => {
+                  let icon = '';
+                  if (c.startsWith('user:')) icon = '👤';
+                  else if (c === 'doc_agent') icon = '📄';
+                  else if (c === 'data_agent') icon = '📊';
+                  else if (c === 'external_agent') icon = '🌐';
+                  return `${icon} ${escapeHtml(c)}`;
+                }).join(' → ');
+              }
+              return `
               <tr>
                 <td>${escapeHtml(item.created_at)}</td>
                 <td>${escapeHtml(item.agent_id || "-")}</td>
+                <td style="font-size:0.75rem;white-space:nowrap">${chainHtml}</td>
                 <td>${escapeHtml(item.action)}</td>
                 <td>${escapeHtml(item.resource)}</td>
                 <td class="${item.decision === "allow" ? "decision-allow" : "decision-deny"}">${escapeHtml(item.decision)}</td>
                 <td>${escapeHtml(item.reason)}</td>
               </tr>
-            `,
+            `;
+            },
           )
           .join("")}
       </tbody>

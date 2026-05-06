@@ -1,4 +1,4 @@
-﻿var GOV = (function() {
+var GOV = (function() {
     var BASE = '/api/governance';
     var refreshTimer = null;
     var currentFilter = null;
@@ -238,6 +238,77 @@
         }
     }
 
+    async function demoEscalation() {
+        showGlobalAlert('🔒 正在执行越权拦截演示...', 'info');
+        try {
+            var result = await fetchJSON('/api/delegate/demo/escalation-attack', { method: 'POST' });
+            var steps = result.steps || [];
+            var blocked = steps.find(function(s) { return s.success === false; });
+            if (blocked) {
+                showGlobalAlert('🔒 越权拦截成功! external_agent → data_agent 被拒绝: ' + (blocked.reason || '').substring(0, 80), 'error');
+            } else {
+                showGlobalAlert('⚠️ 越权拦截演示完成', 'info');
+            }
+            refresh();
+        } catch (e) {
+            showGlobalAlert('❌ 越权拦截演示失败: ' + e.message, 'error');
+        }
+    }
+
+    async function runCollaboration() {
+        var reportEl = document.getElementById('collabReport');
+        if (reportEl) {
+            reportEl.style.display = 'block';
+            reportEl.textContent = '⏳ 正在执行三Agent协作（真实后端调用）...\n\n';
+            reportEl.textContent += '👤 用户发起请求: "综合分析AI技术趋势"\n';
+            reportEl.textContent += '   → 触发协作任务类型（关键词"综合"匹配）\n\n';
+        }
+        showGlobalAlert('🔗 正在执行三Agent协作演示...', 'info');
+        try {
+            var resetResult = await fetchJSON(BASE + '/reset-all', { method: 'POST' });
+            var result = await fetchJSON('/api/feishu/test', {
+                method: 'POST',
+                body: JSON.stringify({ user_id: 'gov_collab_user', message: '综合分析AI技术趋势' }),
+            });
+            var status = result.status || 'unknown';
+            var trust = result.trust_score != null ? result.trust_score.toFixed(2) : '—';
+            var capability = result.capability || 'N/A';
+            var chain = result.chain || [];
+            var platformRisk = result.platform_risk;
+            var content = result.content || '';
+
+            if (reportEl) {
+                var lines = [];
+                lines.push('━━━ 协作执行结果 ━━━');
+                lines.push('status: ' + status);
+                lines.push('capability: ' + capability);
+                lines.push('trust_score: ' + trust);
+                if (chain.length > 0) lines.push('delegation_chain: ' + chain.join(' → '));
+                if (platformRisk != null) lines.push('platform_risk: ' + platformRisk.toFixed(2));
+                lines.push('');
+                lines.push('━━━ 协作报告 ━━━');
+                lines.push(content || '（无内容）');
+                reportEl.textContent = lines.join('\n');
+            }
+
+            if (status === 'success' || status === 'degraded') {
+                var msg = '✅ 三Agent协作成功! ';
+                msg += 'trust: ' + trust + ' | ';
+                msg += 'capability: ' + capability + ' | ';
+                msg += 'chain: ' + chain.join(' → ');
+                showGlobalAlert(msg, 'success');
+            } else {
+                showGlobalAlert('⚠️ 协作返回: ' + status + ' trust: ' + trust, 'info');
+            }
+            refresh();
+        } catch (e) {
+            if (reportEl) {
+                reportEl.textContent = '❌ 三Agent协作演示失败: ' + e.message;
+            }
+            showGlobalAlert('❌ 三Agent协作演示失败: ' + e.message, 'error');
+        }
+    }
+
     async function revokeAgent(agentId) {
         try {
             var result = await fetchJSON(BASE + '/revoke-agent', {
@@ -279,6 +350,8 @@
     return {
         refresh: refresh,
         runDemo: runDemo,
+        runCollaboration: runCollaboration,
+        demoEscalation: demoEscalation,
         demoPlatform: demoPlatform,
         revokeAgent: revokeAgent,
         resetAgent: resetAgent,

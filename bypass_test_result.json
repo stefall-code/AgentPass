@@ -31,7 +31,7 @@
     {
       "name": "Valid token → /me works",
       "passed": true,
-      "detail": "agent_id=agent_75b3d448, token obtained"
+      "detail": "agent_id=agent_4f578d1a, token obtained"
     },
     {
       "name": "basic role → admin endpoint denied",

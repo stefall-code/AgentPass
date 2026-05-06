@@ -15,8 +15,23 @@ from app.models import AgentRow, IssuedTokenRow
 
 
 def _hash_api_key(api_key: str) -> str:
+    try:
+        import bcrypt
+        return bcrypt.hashpw(api_key.encode("utf-8"), bcrypt.gensalt(rounds=12)).decode("utf-8")
+    except ImportError:
+        raw = f"{settings.JWT_SECRET}:{api_key}".encode("utf-8")
+        return hashlib.sha256(raw).hexdigest()
+
+
+def _verify_api_key(api_key: str, stored_hash: str) -> bool:
+    try:
+        import bcrypt
+        if stored_hash.startswith("$2b$") or stored_hash.startswith("$2a$"):
+            return bcrypt.checkpw(api_key.encode("utf-8"), stored_hash.encode("utf-8"))
+    except ImportError:
+        pass
     raw = f"{settings.JWT_SECRET}:{api_key}".encode("utf-8")
-    return hashlib.sha256(raw).hexdigest()
+    return hmac.compare_digest(hashlib.sha256(raw).hexdigest(), stored_hash)
 
 
 def _decode_json(raw: Optional[str]) -> Dict[str, Any]:
@@ -119,7 +134,7 @@ def authenticate_agent(agent_id: str, api_key: str) -> Optional[Dict[str, Any]]:
     agent = get_agent(agent_id)
     if not agent:
         return None
-    if not hmac.compare_digest(agent["api_key_hash"], _hash_api_key(api_key)):
+    if not _verify_api_key(api_key, agent["api_key_hash"]):
         return None
     return agent
 
@@ -237,6 +252,7 @@ def sync_demo_agents(reset_state: bool = False) -> None:
     now = database.utc_now()
     max_retries = 3
     retry_count = 0
+    valid_ids = {item["agent_id"] for item in settings.DEMO_AGENTS}
 
     while retry_count < max_retries:
         try:
@@ -268,6 +284,7 @@ def sync_demo_agents(reset_state: bool = False) -> None:
                             updated_at=now,
                             last_login_at=None,
                         ))
+                db.query(AgentRow).filter(~AgentRow.agent_id.in_(valid_ids)).delete(synchronize_session=False)
                 db.commit()
             return
         except Exception:

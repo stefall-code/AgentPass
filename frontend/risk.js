@@ -1,4 +1,4 @@
-﻿var RR = (function() {
+var RR = (function() {
     var BASE = '/api/delegate';
     var AUDIT_BASE = '/api/delegate/audit';
     var WS_BASE = location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -337,8 +337,14 @@
     function renderTopThreats(agents, autoRevokedAgents) {
         var el = document.getElementById('topThreats');
         if (!el) return;
-        var entries = Object.entries(agents);
-        if (!entries.length) {
+        var CORE_AGENTS = ['doc_agent', 'data_agent', 'external_agent'];
+        var entries = Object.entries(agents).filter(function(pair) {
+            return CORE_AGENTS.indexOf(pair[0]) >= 0;
+        });
+        var demoEntries = Object.entries(agents).filter(function(pair) {
+            return CORE_AGENTS.indexOf(pair[0]) < 0;
+        });
+        if (!entries.length && !demoEntries.length) {
             el.innerHTML = '<div style="color:rgba(255,255,255,0.25);text-align:center;padding:16px;font-size:0.82rem">无 Agent 数据</div>';
             return;
         }
@@ -374,9 +380,28 @@
                 attack_intent: '',
                 severity: '',
             };
-            html += '<div style="margin-top:6px">' + IAM_EXPLAIN.makeBtn('🧠 Explain', explainData) + '</div>';
+            html += '<div style="margin-top:4px">' + IAM_EXPLAIN.makeBtn('🧠 Explain', explainData) + '</div>';
             html += '</div>';
         });
+        if (demoEntries.length > 0) {
+            html += '<div style="margin-top:8px;padding-top:8px;border-top:1px solid rgba(255,255,255,0.06)">';
+            html += '<div style="font-size:0.65rem;color:rgba(255,255,255,0.3);margin-bottom:6px">演示 Agent (' + demoEntries.length + ')</div>';
+            var demoSorted = demoEntries.sort(function(a, b) { return a[1].trust_score - b[1].trust_score; });
+            demoSorted.slice(0, 5).forEach(function(pair) {
+                var id = pair[0], info = pair[1];
+                var risk = 1 - info.trust_score;
+                var isRevoked = id in autoRevokedAgents;
+                var riskColor = risk > 0.7 ? '#ef4444' : (risk > 0.5 ? '#f87171' : (risk > 0.3 ? '#fbbf24' : '#34d399'));
+                html += '<div style="display:flex;justify-content:space-between;align-items:center;padding:4px 0;font-size:0.7rem">';
+                html += '<span style="color:rgba(255,255,255,0.5)">' + id.replace('demo_', '') + '</span>';
+                html += '<span style="color:' + riskColor + ';font-weight:600">risk ' + risk.toFixed(2) + '</span>';
+                html += '</div>';
+            });
+            if (demoEntries.length > 5) {
+                html += '<div style="font-size:0.6rem;color:rgba(255,255,255,0.2);text-align:center;padding:4px">... +' + (demoEntries.length - 5) + ' more</div>';
+            }
+            html += '</div>';
+        }
         el.innerHTML = html;
     }
 

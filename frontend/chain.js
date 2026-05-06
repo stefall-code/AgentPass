@@ -1,4 +1,4 @@
-﻿﻿﻿var CP = (function() {
+﻿var CP = (function() {
     var BASE = '/api/delegate';
     var WS_BASE = location.protocol === 'https:' ? 'wss:' : 'ws:';
 
@@ -618,7 +618,7 @@
         if (!events || events.length === 0) return [];
         var steps = [];
         events.forEach(function(ev) {
-            var chain = (ev.agent_chain || []).map(function(c) {
+            var chain = (ev.delegation_chain || ev.agent_chain || ev.chain || []).map(function(c) {
                 return c.startsWith('user:') ? 'user' : c;
             });
             var result = ev.result || 'allow';

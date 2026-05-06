@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<!DOCTYPE html>
+﻿﻿﻿﻿﻿﻿﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8"/>
@@ -45,6 +45,8 @@
           <div style="height:1px;background:rgba(255,255,255,0.1);margin:6px 0"></div>
           <a href="/feishu" style="color:#64d2ff;font-weight:600">💬 飞书交互</a>
           <a href="/governance" style="color:#c4b5fd;font-weight:600">🏛️ 统一治理</a>
+          <a href="/demo" style="color:#6366f1;font-weight:600">🎯 演示中心</a>
+          <a href="/gateway" style="color:#60a5fa;font-weight:600">🌐 API Gateway</a>
         </div>
       </div>
     </div>
@@ -115,7 +117,7 @@
         </div>
         <div>
           <div style="font-size:0.9rem;font-weight:800;color:#f5f5f7;letter-spacing:0.06em">AGENTPASS</div>
-          <div style="font-size:0.5rem;color:rgba(255,255,255,0.25);letter-spacing:0.12em;text-transform:uppercase">Security Command Center v2.5</div>
+          <div style="font-size:0.5rem;color:rgba(255,255,255,0.25);letter-spacing:0.12em;text-transform:uppercase">Security Command Center v2.6</div>
         </div>
         <div style="margin-left:8px;display:flex;gap:6px">
           <span style="width:6px;height:6px;border-radius:50%;background:#34d399;animation:ccPulse 2s infinite"></span>
@@ -216,6 +218,43 @@
             <span style="font-size:0.55rem;padding:3px 8px;border-radius:4px;background:rgba(196,181,253,0.1);color:#c4b5fd;border:1px solid rgba(196,181,253,0.2)">Replay Guard ✓</span>
           </div>
         </div>
+        <div style="margin-top:10px;padding:12px;background:rgba(0,0,0,0.3);border-radius:10px;border:1px solid rgba(249,115,22,0.15)">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+            <div style="display:flex;align-items:center;gap:6px">
+              <span style="font-size:0.7rem">🔥</span>
+              <span style="font-size:0.55rem;color:rgba(249,115,22,0.7);text-transform:uppercase;letter-spacing:0.1em;font-weight:700">Adversarial Agent</span>
+            </div>
+            <button id="ccRunProbeBtn" style="font-size:0.5rem;padding:3px 8px;border-radius:4px;background:rgba(249,115,22,0.15);color:#f97316;border:1px solid rgba(249,115,22,0.3);cursor:pointer;font-weight:600;letter-spacing:0.04em">RUN PROBES</button>
+          </div>
+          <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">
+            <div style="font-size:1.8rem;font-weight:900;color:#f97316;line-height:1" id="ccProbeScore">8/8</div>
+            <div>
+              <div style="font-size:0.5rem;color:rgba(255,255,255,0.3);text-transform:uppercase;letter-spacing:0.08em">Probes Blocked</div>
+              <div style="font-size:0.5rem;color:rgba(249,115,22,0.5);margin-top:2px" id="ccProbeStatement">内置攻击者持续验证安全边界</div>
+            </div>
+          </div>
+          <div id="ccProbeResults" style="max-height:120px;overflow-y:auto;font-family:'SF Mono','JetBrains Mono',monospace;font-size:0.52rem;line-height:1.7"></div>
+        </div>
+        <div style="margin-top:10px;padding:12px;background:rgba(0,0,0,0.3);border-radius:10px;border:1px solid rgba(56,189,248,0.15)">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+            <div style="display:flex;align-items:center;gap:6px">
+              <span style="font-size:0.7rem">🛡</span>
+              <span style="font-size:0.55rem;color:rgba(56,189,248,0.7);text-transform:uppercase;letter-spacing:0.1em;font-weight:700">Defense Mode</span>
+            </div>
+            <div id="ccDefenseModeBadge" style="font-size:0.5rem;padding:2px 8px;border-radius:4px;background:rgba(56,189,248,0.15);color:#38bdf8;border:1px solid rgba(56,189,248,0.3);font-weight:600">—</div>
+          </div>
+          <div style="font-size:0.5rem;color:rgba(255,255,255,0.4);line-height:1.6" id="ccDefenseModeInfo">Loading...</div>
+        </div>
+        <div style="margin-top:10px;padding:12px;background:rgba(0,0,0,0.3);border-radius:10px;border:1px solid rgba(52,211,153,0.15)">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+            <div style="display:flex;align-items:center;gap:6px">
+              <span style="font-size:0.7rem">⚡</span>
+              <span style="font-size:0.55rem;color:rgba(52,211,153,0.7);text-transform:uppercase;letter-spacing:0.1em;font-weight:700">Performance</span>
+            </div>
+            <button id="ccRunBenchBtn" style="font-size:0.5rem;padding:3px 8px;border-radius:4px;background:rgba(52,211,153,0.15);color:#34d399;border:1px solid rgba(52,211,153,0.3);cursor:pointer;font-weight:600;letter-spacing:0.04em">BENCHMARK</button>
+          </div>
+          <div style="font-size:0.5rem;color:rgba(255,255,255,0.4);line-height:1.6" id="ccPerfInfo">Loading...</div>
+        </div>
       </div>
     </div>
   </div>
@@ -233,6 +272,7 @@
         <h3 style="margin:0;color:#ff3b30;font-size:1.3rem">📡 实时安全事件流</h3>
         <div style="display:flex;gap:10px">
           <button class="btn-ghost sm" id="simulateAttackBtn" style="color:#ff3b30;border-color:rgba(239,68,68,0.5);font-weight:700;font-size:0.95rem;padding:8px 18px">🔥 模拟攻击</button>
+          <button class="btn-ghost sm" id="judgeAcceptBtn" style="color:#34d399;border-color:rgba(52,211,153,0.5);font-weight:700;font-size:0.95rem;padding:8px 18px">✅ 评委验收</button>
           <a href="/chain" class="btn-ghost sm" style="color:#af52de;border-color:rgba(175,82,222,0.4);text-decoration:none;padding:8px 18px">🔗 Chain Viewer</a>
         </div>
       </div>
@@ -270,8 +310,8 @@
     </div>
     <div class="overview-grid reveal" style="margin-top:24px">
       <div class="overview-card">
-        <h3>Demo Agents</h3>
-        <div id="demoAgentCards" class="card-list"></div>
+        <h3>异构 Agent 架构</h3>
+        <div id="heterogeneousAgentCards" class="card-list"></div>
       </div>
       <div class="overview-card">
         <h3>受保护文档</h3>
@@ -790,7 +830,7 @@
 <!-- ═══ FOOTER ═══ -->
 <footer class="footer">
   <div class="container">
-    <p>AgentPass v2.5 — AI Agent 安全治理平台 · Built with FastAPI + SQLite · <a href="/docs" target="_blank">Swagger API</a> · <a href="/feishu" style="color:#64d2ff">飞书交互</a></p>
+    <p>AgentPass v2.6 — AI Agent 安全治理平台 · Built with FastAPI + SQLite · <a href="/docs" target="_blank">Swagger API</a> · <a href="/feishu" style="color:#64d2ff">飞书交互</a> · <a href="/demo" style="color:#6366f1">演示中心</a> · <a href="/chain" style="color:#c4b5fd">委派链</a> · <a href="/risk" style="color:#f87171">风险面板</a></p>
   </div>
 </footer>
 
@@ -825,7 +865,7 @@
 <!-- ═══ TOAST ═══ -->
 <div id="toastStack" class="toast-stack"></div>
 
-<script type="module" src="/static/app.js?v=3.2"></script>
+<script type="module" src="/static/app.js?v=3.3"></script>
 <script src="/static/mode.js?v=1.0"></script><script src="/static/iam-explain.js?v=1.2"></script>
 <script src="/static/command-center.js?v=5.1"></script>
 <script src="/static/feishu-section.js?v=1.1"></script>

@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿var IAM_EXPLAIN = (function() {
+﻿﻿var IAM_EXPLAIN = (function() {
 
     var styleInjected = false;
 

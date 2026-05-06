@@ -1,9 +1,11 @@
-﻿const DELEGATE_BASE = '/api/delegate';
+const DELEGATE_BASE = '/api/delegate';
 const AUDIT_BASE = '/api/delegate/audit';
 const WS_BASE = location.protocol === 'https:' ? 'wss:' : 'ws:';
 
 let _auditWs = null;
 let _wsConnected = false;
+let _wsReconnectAttempts = 0;
+const _WS_MAX_DELAY = 30000;
 let _logEntries = [];
 let _trustScores = {};
 let _detailCache = {};
@@ -18,6 +20,7 @@ function connectAuditWS() {
         _auditWs = new WebSocket(wsUrl);
         _auditWs.onopen = () => {
             _wsConnected = true;
+            _wsReconnectAttempts = 0;
             updateWSStatus(true);
             pushLiveEvent('allow', 'system', 'WebSocket connected');
         };
@@ -27,7 +30,9 @@ function connectAuditWS() {
         _auditWs.onclose = () => {
             _wsConnected = false;
             updateWSStatus(false);
-            setTimeout(connectAuditWS, 3000);
+            _wsReconnectAttempts++;
+            const delay = Math.min(1000 * Math.pow(2, _wsReconnectAttempts - 1) + Math.random() * 1000, _WS_MAX_DELAY);
+            setTimeout(connectAuditWS, delay);
         };
         _auditWs.onerror = () => { _auditWs.close(); };
     } catch {
@@ -69,6 +74,9 @@ function pushLiveEvent(type, agent, action) {
 
 function buildLogEntry(log) {
     const ctx = log.context || {};
+    const delegationChain = ctx.delegation_chain || ctx.chain || log.chain || null;
+    const delegationSteps = ctx.delegation_steps || null;
+    const delegationChainDisplay = ctx.delegation_chain_display || (delegationChain ? delegationChain.join(' → ') : null);
     return {
         id: log.id || Date.now(),
         timestamp: log.timestamp || log.created_at || new Date().toISOString(),
@@ -82,8 +90,11 @@ function buildLogEntry(log) {
         trust_score_after: ctx.trust_score_after ?? null,
         auto_revoked: !!(ctx.auto_revoked || log.auto_revoked),
         token_id: log.token_id || ctx.token || null,
-        chain: ctx.chain || log.chain || null,
+        chain: delegationChain,
         chain_detail: ctx.chain_detail || null,
+        delegation_chain: delegationChain,
+        delegation_steps: delegationSteps,
+        delegation_chain_display: delegationChainDisplay,
         revoked: ctx.revoked ?? null,
         platform: ctx.platform || 'web',
         entry_point: ctx.entry_point || 'frontend',
@@ -244,14 +255,14 @@ async function loadAuditLogs() {
         renderTable();
         refreshStats();
     } catch (e) {
-        document.getElementById('auditTableBody').innerHTML = `<tr><td colspan="8" style="color:#f87171;text-align:center;padding:20px">加载失败: ${e.message}</td></tr>`;
+        document.getElementById('auditTableBody').innerHTML = `<tr><td colspan="9" style="color:#f87171;text-align:center;padding:20px">加载失败: ${e.message}</td></tr>`;
     }
 }
 
 function renderTable() {
     const tbody = document.getElementById('auditTableBody');
     if (!_logEntries.length) {
-        tbody.innerHTML = '<tr><td colspan="8" class="ac-empty">无审计记录</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="9" class="ac-empty">无审计记录</td></tr>';
         return;
     }
     tbody.innerHTML = _logEntries.map((entry, i) => renderRow(entry, i, false)).join('');
@@ -269,7 +280,7 @@ function appendRowToTable(entry, isNew) {
     const detailTr = document.createElement('tr');
     detailTr.className = 'ac-detail-row';
     detailTr.id = `detail-${entry.id}`;
-    detailTr.innerHTML = `<td colspan="8"><div class="ac-detail-content">${renderDetailContent(entry)}</div></td>`;
+    detailTr.innerHTML = `<td colspan="9"><div class="ac-detail-content">${renderDetailContent(entry)}</div></td>`;
 
     if (tbody.firstChild) {
         tbody.insertBefore(detailTr, tbody.firstChild);
@@ -287,7 +298,7 @@ function appendRowToTable(entry, isNew) {
 
 function renderRow(entry, index, isNew) {
     return `<tr class="${isNew ? 'new-row' : ''}">${renderRowCells(entry, index)}</tr>
-            <tr class="ac-detail-row" id="detail-${entry.id}"><td colspan="8"><div class="ac-detail-content">${renderDetailContent(entry)}</div></td></tr>`;
+            <tr class="ac-detail-row" id="detail-${entry.id}"><td colspan="9"><div class="ac-detail-content">${renderDetailContent(entry)}</div></td></tr>`;
 }
 
 function renderRowCells(entry, index) {
@@ -325,6 +336,30 @@ function renderRowCells(entry, index) {
         platformTag = '<span style="display:inline-block;background:rgba(59,130,246,0.2);color:#60a5fa;font-size:0.65rem;padding:1px 6px;border-radius:8px;margin-left:4px;vertical-align:middle">💬 Feishu</span>';
     }
 
+    let chainHtml = '<span style="color:rgba(255,255,255,0.3)">—</span>';
+    const dChain = entry.delegation_chain || entry.chain;
+    if (dChain && dChain.length > 0) {
+        const chainItems = dChain.map((c, i) => {
+            let icon = '';
+            let color = '#c4b5fd';
+            if (c.startsWith('user:')) {
+                icon = '👤';
+                color = '#60a5fa';
+            } else if (c === 'doc_agent') {
+                icon = '📄';
+                color = '#fbbf24';
+            } else if (c === 'data_agent') {
+                icon = '📊';
+                color = '#34d399';
+            } else if (c === 'external_agent') {
+                icon = '🌐';
+                color = '#f87171';
+            }
+            return `<span style="color:${color};font-weight:600;white-space:nowrap">${icon} ${c}</span>`;
+        });
+        chainHtml = chainItems.join('<span style="color:rgba(255,255,255,0.3);margin:0 2px">→</span>');
+    }
+
     var explainBtnData = {
         agent_id: entry.agent_id || '',
         action: entry.action || '',
@@ -332,7 +367,7 @@ function renderRowCells(entry, index) {
         reason: entry.reason || '',
         trust_score: entry.trust_score_after || entry.trust_score_before,
         risk_score: entry.risk_score || 0,
-        chain_detail: entry.chain || [],
+        chain_detail: dChain || [],
         blocked_at: entry.blocked_at || '',
         auto_revoked: !!entry.auto_revoked,
         prompt_risk_score: entry.prompt_risk_score || null,
@@ -344,6 +379,7 @@ function renderRowCells(entry, index) {
     return `
         <td style="white-space:nowrap;color:rgba(255,255,255,0.45);font-size:0.72rem">${ts}</td>
         <td style="color:#c4b5fd;font-weight:500">${entry.agent_id}${platformTag}</td>
+        <td style="max-width:260px;font-size:0.72rem">${chainHtml}</td>
         <td style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${entry.action}">${entry.action}</td>
         <td><span class="ac-badge ${badgeClass}">${badgeText}</span></td>
         <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:rgba(255,255,255,0.5);font-size:0.72rem" title="${entry.reason || ''}">${reasonShort}</td>
@@ -380,8 +416,50 @@ function renderDetailContent(entry) {
         sections.push(`<div class="ac-detail-section"><div class="ac-detail-label">JTI</div><div class="ac-detail-value">${ctx.jti}</div></div>`);
     }
 
-    if (entry.chain && entry.chain.length) {
-        sections.push(`<div class="ac-detail-section"><div class="ac-detail-label">Chain</div><div class="ac-trace-pipeline">${entry.chain.map((c, i) => `<span class="ac-trace-step pass">${i === 0 ? '👤' : '→'} ${c}</span>`).join('')}</div></div>`);
+    const dChain = entry.delegation_chain || entry.chain;
+    if (dChain && dChain.length) {
+        const chainSteps = dChain.map((c, i) => {
+            let icon = '';
+            let color = '#c4b5fd';
+            let bg = 'rgba(196,181,253,0.08)';
+            let borderColor = 'rgba(196,181,253,0.3)';
+            if (c.startsWith('user:')) {
+                icon = '👤';
+                color = '#60a5fa';
+                bg = 'rgba(96,165,250,0.08)';
+                borderColor = 'rgba(96,165,250,0.3)';
+            } else if (c === 'doc_agent') {
+                icon = '📄';
+                color = '#fbbf24';
+                bg = 'rgba(251,191,36,0.08)';
+                borderColor = 'rgba(251,191,36,0.3)';
+            } else if (c === 'data_agent') {
+                icon = '📊';
+                color = '#34d399';
+                bg = 'rgba(52,211,153,0.08)';
+                borderColor = 'rgba(52,211,153,0.3)';
+            } else if (c === 'external_agent') {
+                icon = '🌐';
+                color = '#f87171';
+                bg = 'rgba(248,113,113,0.08)';
+                borderColor = 'rgba(248,113,113,0.3)';
+            }
+            return `<span class="ac-trace-step pass" style="border-color:${borderColor};background:${bg};color:${color}">${icon} ${c}</span>`;
+        });
+        sections.push(`<div class="ac-detail-section"><div class="ac-detail-label">🔗 Delegation Chain（委派链）</div><div class="ac-trace-pipeline">${chainSteps.join('<span style="color:rgba(255,255,255,0.3);margin:0 2px;font-weight:700">→</span>')}</div></div>`);
+    }
+
+    const delegationSteps = entry.delegation_steps || ctx.delegation_steps;
+    if (delegationSteps && delegationSteps.length > 0) {
+        let stepsHtml = '<div style="margin-top:8px">';
+        stepsHtml += '<table style="width:100%;border-collapse:collapse;font-size:0.72rem">';
+        stepsHtml += '<tr style="color:rgba(255,255,255,0.4);font-size:0.65rem;text-transform:uppercase"><th style="padding:4px 8px;text-align:left;border-bottom:1px solid rgba(255,255,255,0.08)">From</th><th style="padding:4px 8px;text-align:left;border-bottom:1px solid rgba(255,255,255,0.08)">To</th><th style="padding:4px 8px;text-align:left;border-bottom:1px solid rgba(255,255,255,0.08)">Action</th><th style="padding:4px 8px;text-align:left;border-bottom:1px solid rgba(255,255,255,0.08)">Type</th></tr>';
+        for (const step of delegationSteps) {
+            const typeLabel = step.type === 'delegate' ? '<span style="color:#fbbf24">🔄 委派</span>' : '<span style="color:#34d399">⚡ 执行</span>';
+            stepsHtml += `<tr><td style="padding:4px 8px;color:#60a5fa">${step.from}</td><td style="padding:4px 8px;color:#c4b5fd">${step.to}</td><td style="padding:4px 8px;color:rgba(255,255,255,0.6)">${step.action}</td><td style="padding:4px 8px">${typeLabel}</td></tr>`;
+        }
+        stepsHtml += '</table></div>';
+        sections.push(`<div class="ac-detail-section"><div class="ac-detail-label">📋 Delegation Steps（委派步骤）</div>${stepsHtml}</div>`);
     }
 
     if (ctx.capabilities && ctx.capabilities.length) {
@@ -420,7 +498,7 @@ function renderDetailContent(entry) {
         reason: entry.reason || '',
         trust_score: entry.trust_score_after || entry.trust_score_before,
         risk_score: entry.risk_score || 0,
-        chain_detail: entry.chain || [],
+        chain_detail: dChain || [],
         blocked_at: entry.blocked_at || '',
         auto_revoked: entry.auto_revoked || false,
         prompt_risk_score: entry.prompt_risk_score || null,

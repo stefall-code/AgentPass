@@ -63,6 +63,16 @@ class AuditRecord:
 
 
 _PATH_ACTION_MAP = {
+    "/open-apis/im/v1/messages": "write:feishu_message",
+    "/open-apis/docx/v1/documents": "write:doc",
+    "/open-apis/sheets/v3/spreadsheets": "write:sheet",
+    "/open-apis/calendar/v4/calendars": "write:calendar",
+    "/open-apis/drive/v1/files": "read:drive",
+    "/open-apis/bitable/v1/apps": "read:bitable",
+    "/open-apis/wiki/v2/spaces": "read:wiki",
+    "/open-apis/approval/v4/approvals": "read:approval",
+    "/open-apis/contact/v3/users": "read:contact",
+    "/open-apis/auth/v3/tenant_access_token": "auth:token",
     "/im/v1/messages": "write:feishu_message",
     "/im/v1/messages/": "write:feishu_message",
     "/docx/v1/documents": "write:doc",
@@ -114,24 +124,14 @@ def mapRequestToAction(path: str, method: str = "GET") -> str:
 
 def _issue_root_token(agent_id: str) -> Optional[str]:
     try:
+        from app.delegation.engine import CAPABILITY_AGENTS
+        agent_caps = CAPABILITY_AGENTS.get(agent_id, {})
+        capabilities = agent_caps.get("capabilities", ["read:public"])
         engine = _get_engine()
         token = engine.issue_root_token(
             agent_id=agent_id,
             delegated_user="admin",
-            capabilities=[
-                "write:doc", "write:doc:public",
-                "write:im", "write:feishu_message",
-                "read:calendar", "write:calendar",
-                "read:feishu_table:finance",
-                "read:feishu_table:hr",
-                "read:bitable",
-                "read:wiki", "read:drive",
-                "write:sheet", "write:drive",
-                "read:contact", "read:mail",
-                "read:approval",
-                "delegate:data_agent",
-                "api:knowledge_base",
-            ],
+            capabilities=capabilities,
             expires_in_minutes=60,
         )
         return token
@@ -263,6 +263,28 @@ def logAudit(
     _audit_log.append(record)
     if len(_audit_log) > _MAX_AUDIT_LOG:
         _audit_log.pop(0)
+
+    try:
+        from app.audit import log_event as audit_log_event
+        audit_log_event(
+            action=action,
+            resource=path or "iam_gateway",
+            decision=decision,
+            reason=reason[:200],
+            agent_id=agent_id,
+            context={
+                "trust_score": trust_score,
+                "risk_score": risk_score,
+                "blocked_at": blocked_at,
+                "auto_revoked": auto_revoked,
+                "latency_ms": latency_ms,
+                "path": path,
+                "method": method,
+                "source": "iam_gateway",
+            },
+        )
+    except Exception as e:
+        logger.warning("IAM Gateway audit log_event failed: %s", e)
 
     status_icon = "✅" if decision == "allow" else ("🔥" if auto_revoked else "❌")
     logger.info(

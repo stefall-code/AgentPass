@@ -19,6 +19,8 @@ _token_expires_at: float = 0
 
 
 class FeishuClient:
+    _tenant_domain: Optional[str] = None
+
     def __init__(self, agent_id: Optional[str] = None, iam_enabled: bool = IAM_GATEWAY_ENABLED):
         self.app_id = settings.FEISHU_APP_ID
         self.app_secret = settings.FEISHU_APP_SECRET
@@ -49,6 +51,28 @@ class FeishuClient:
     def is_configured(self) -> bool:
         return bool(self.app_id and self.app_secret)
 
+    async def _get_tenant_domain(self) -> str:
+        if FeishuClient._tenant_domain:
+            return FeishuClient._tenant_domain
+        try:
+            token = await self.get_tenant_access_token()
+            if not token:
+                return "feishu.cn"
+            url = f"{self.base_url}/tenant/v2/tenant/query"
+            headers = {"Authorization": f"Bearer {token}"}
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                resp = await client.get(url, headers=headers)
+                data = resp.json()
+            if data.get("code") == 0:
+                domain = data.get("data", {}).get("tenant", {}).get("domain", "")
+                if domain:
+                    FeishuClient._tenant_domain = domain
+                    logger.info("Feishu tenant domain: %s", domain)
+                    return domain
+        except Exception as e:
+            logger.warning("Failed to get tenant domain: %s", e)
+        return "feishu.cn"
+
     async def get_tenant_access_token(self) -> str:
         global _tenant_access_token, _token_expires_at
 
@@ -56,8 +80,8 @@ class FeishuClient:
             return _tenant_access_token
 
         if not self.is_configured():
-            logger.warning("Feishu credentials not configured, using mock mode")
-            return "mock_tenant_token"
+            logger.error("Feishu credentials not configured")
+            return ""
 
         url = f"{self.base_url}/auth/v3/tenant_access_token/internal"
         payload = {
@@ -80,32 +104,33 @@ class FeishuClient:
 
     async def send_message(self, receive_id: str, content: str, msg_type: str = "text", receive_id_type: str = "open_id") -> Dict[str, Any]:
         if not self.is_configured():
-            logger.info("[MOCK] send_message to %s: %s", receive_id, content[:100])
             action = "write:feishu_message"
+            iam_result = None
             if self.iam_enabled:
-                result = callIAMCheck(self.agent_id, action)
+                iam_result = callIAMCheck(self.agent_id, action)
                 logAudit(
                     agent_id=self.agent_id,
                     action=action,
-                    decision="allow" if result.allowed else "deny",
-                    reason=result.reason,
-                    latency_ms=result.latency_ms,
-                    trust_score=result.trust_score,
-                    risk_score=result.risk_score,
-                    blocked_at=result.blocked_at,
-                    auto_revoked=result.auto_revoked,
+                    decision="allow" if iam_result.allowed else "deny",
+                    reason=iam_result.reason,
+                    latency_ms=iam_result.latency_ms,
+                    trust_score=iam_result.trust_score,
+                    risk_score=iam_result.risk_score,
+                    blocked_at=iam_result.blocked_at,
+                    auto_revoked=iam_result.auto_revoked,
                     path="/im/v1/messages",
                     method="POST",
                 )
-                if not result.allowed:
+                if not iam_result.allowed:
                     return {
                         "code": -1,
-                        "msg": f"IAM Gateway: Request blocked — {result.reason}",
+                        "msg": f"IAM Gateway: Request blocked — {iam_result.reason}",
                         "iam_blocked": True,
                         "agent_id": self.agent_id,
                         "action": action,
                     }
-            return {"code": 0, "msg": "ok", "mock": True}
+            logger.warning("send_message skipped: Feishu not configured")
+            return {"code": -1, "msg": "Feishu not configured: APP_ID/APP_SECRET required", "iam_checked": self.iam_enabled, "mode": "not_configured"}
 
         token = await self.get_tenant_access_token()
         url = f"{self.base_url}/im/v1/messages"
@@ -145,42 +170,37 @@ class FeishuClient:
 
     async def create_doc(self, title: str, content: str) -> Dict[str, Any]:
         if not self.is_configured():
-            logger.info("[MOCK] create_doc: %s", title)
             action = "write:doc"
+            iam_result = None
             if self.iam_enabled:
-                result = callIAMCheck(self.agent_id, action)
+                iam_result = callIAMCheck(self.agent_id, action)
                 logAudit(
                     agent_id=self.agent_id,
                     action=action,
-                    decision="allow" if result.allowed else "deny",
-                    reason=result.reason,
-                    latency_ms=result.latency_ms,
-                    trust_score=result.trust_score,
-                    risk_score=result.risk_score,
-                    blocked_at=result.blocked_at,
-                    auto_revoked=result.auto_revoked,
+                    decision="allow" if iam_result.allowed else "deny",
+                    reason=iam_result.reason,
+                    latency_ms=iam_result.latency_ms,
+                    trust_score=iam_result.trust_score,
+                    risk_score=iam_result.risk_score,
+                    blocked_at=iam_result.blocked_at,
+                    auto_revoked=iam_result.auto_revoked,
                     path="/docx/v1/documents",
                     method="POST",
                 )
-                if not result.allowed:
+                if not iam_result.allowed:
                     return {
                         "code": -1,
-                        "msg": f"IAM Gateway: Request blocked — {result.reason}",
+                        "msg": f"IAM Gateway: Request blocked — {iam_result.reason}",
                         "iam_blocked": True,
                         "agent_id": self.agent_id,
                         "action": action,
                     }
+            logger.warning("create_doc skipped: Feishu not configured")
             return {
-                "code": 0,
-                "msg": "ok",
-                "mock": True,
-                "data": {
-                    "document": {
-                        "document_id": "mock_doc_" + hashlib.md5(title.encode()).hexdigest()[:8],
-                        "title": title,
-                        "url": f"https://feishu.cn/doc/mock_{hashlib.md5(title.encode()).hexdigest()[:8]}",
-                    }
-                },
+                "code": -1,
+                "msg": "Feishu not configured: cannot create real document",
+                "iam_checked": self.iam_enabled,
+                "mode": "not_configured",
             }
 
         token = await self.get_tenant_access_token()
@@ -207,63 +227,66 @@ class FeishuClient:
             return data
 
         doc_id = data.get("data", {}).get("document", {}).get("document_id", "")
-        doc_url = f"https://feishu.cn/doc/{doc_id}"
+        tenant_domain = await self._get_tenant_domain()
+        doc_url = f"https://{tenant_domain}/docx/{doc_id}"
 
         if doc_id and content:
             block_url = f"{self.base_url}/docx/v1/documents/{doc_id}/blocks/{doc_id}/children"
-            text_content = {
-                "children": [
-                    {
-                        "block_type": 2,
-                        "text": {
-                            "elements": [{"text_run": {"content": content}}],
-                            "style": {},
-                        },
-                    }
-                ]
-            }
+            paragraphs = content.split("\n")
+            children = []
+            for para in paragraphs:
+                children.append({
+                    "block_type": 2,
+                    "text": {
+                        "elements": [{"text_run": {"content": para}}],
+                        "style": {},
+                    },
+                })
+            text_content = {"children": children}
             async with self._get_client() as client:
-                await client.post(block_url, json=text_content, headers=headers)
+                block_resp = await client.post(block_url, json=text_content, headers=headers)
+                block_data = block_resp.json()
+                if block_data.get("code") != 0:
+                    logger.warning("Failed to write doc content: code=%s msg=%s", block_data.get("code"), block_data.get("msg", ""))
+                else:
+                    logger.info("Doc content written: %d paragraphs", len(paragraphs))
 
         logger.info("Doc created: %s (%s)", title, doc_url)
         return {"code": 0, "data": {"document": {"document_id": doc_id, "title": title, "url": doc_url}}}
 
     async def query_bitable(self, app_token: str, table_id: str, view_id: str = None, page_size: int = 20) -> Dict[str, Any]:
         if not self.is_configured():
-            logger.info("[MOCK] query_bitable: app=%s table=%s", app_token, table_id)
             action = "read:bitable"
+            iam_result = None
             if self.iam_enabled:
-                result = callIAMCheck(self.agent_id, action)
+                iam_result = callIAMCheck(self.agent_id, action)
                 logAudit(
                     agent_id=self.agent_id,
                     action=action,
-                    decision="allow" if result.allowed else "deny",
-                    reason=result.reason,
-                    latency_ms=result.latency_ms,
-                    trust_score=result.trust_score,
-                    risk_score=result.risk_score,
-                    blocked_at=result.blocked_at,
-                    auto_revoked=result.auto_revoked,
+                    decision="allow" if iam_result.allowed else "deny",
+                    reason=iam_result.reason,
+                    latency_ms=iam_result.latency_ms,
+                    trust_score=iam_result.trust_score,
+                    risk_score=iam_result.risk_score,
+                    blocked_at=iam_result.blocked_at,
+                    auto_revoked=iam_result.auto_revoked,
                     path=f"/bitable/v1/apps/{app_token}/tables/{table_id}/records",
                     method="GET",
                 )
-                if not result.allowed:
+                if not iam_result.allowed:
                     return {
                         "code": -1,
-                        "msg": f"IAM Gateway: Request blocked — {result.reason}",
+                        "msg": f"IAM Gateway: Request blocked — {iam_result.reason}",
                         "iam_blocked": True,
                         "agent_id": self.agent_id,
                         "action": action,
                     }
+            logger.warning("query_bitable skipped: Feishu not configured")
             return {
-                "code": 0,
-                "msg": "ok",
-                "mock": True,
-                "data": {
-                    "items": [
-                        {"Q1营收": "¥12,580,000", "Q1利润": "¥3,150,000", "同比增长": "+18.5%", "利润率": "25.0%"},
-                    ],
-                },
+                "code": -1,
+                "msg": "Feishu not configured: cannot query real bitable data",
+                "iam_checked": self.iam_enabled,
+                "mode": "not_configured",
             }
 
         token = await self.get_tenant_access_token()
@@ -395,6 +418,127 @@ class FeishuClient:
             "chat_id": chat_id,
             "message_id": message_id,
             "msg_type": msg_type,
+        }
+
+    async def _api_get(self, path: str, params: Dict = None) -> Dict[str, Any]:
+        if not self.is_configured():
+            return {"code": -1, "msg": "Feishu not configured", "mode": "not_configured"}
+        token = await self.get_tenant_access_token()
+        if not token:
+            return {"code": -1, "msg": "no token"}
+        headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
+        url = f"{self.base_url}{path}"
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            resp = await client.get(url, headers=headers, params=params or {})
+            return resp.json()
+
+    async def _api_post(self, path: str, body: Dict = None) -> Dict[str, Any]:
+        if not self.is_configured():
+            return {"code": -1, "msg": "Feishu not configured", "mode": "not_configured"}
+        token = await self.get_tenant_access_token()
+        if not token:
+            return {"code": -1, "msg": "no token"}
+        headers = {"Authorization": f"Bearer {token}", "Content-Type": "application/json"}
+        url = f"{self.base_url}{path}"
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            resp = await client.post(url, headers=headers, json=body or {})
+            return resp.json()
+
+    async def get_bot_info(self) -> Dict[str, Any]:
+        return await self._api_get("/bot/v3/info/")
+
+    async def get_calendar_primary(self) -> Dict[str, Any]:
+        return await self._api_get("/calendar/v4/calendars/primary")
+
+    async def get_calendar_events(self, start_time: str = "", end_time: str = "", page_size: int = 10) -> Dict[str, Any]:
+        import time as _t
+        if not start_time:
+            start_time = str(int(_t.time()))
+        if not end_time:
+            end_time = str(int(_t.time()) + 86400 * 7)
+        return await self._api_get("/calendar/v4/calendars/primary/events", {
+            "start_time": start_time, "end_time": end_time, "page_size": page_size,
+        })
+
+    async def get_contact_users(self, page_size: int = 10) -> Dict[str, Any]:
+        return await self._api_get("/contact/v3/users", {"page_size": page_size})
+
+    async def get_task_list(self, page_size: int = 10) -> Dict[str, Any]:
+        return await self._api_get("/task/v2/tasks", {"page_size": page_size})
+
+    async def get_drive_root(self) -> Dict[str, Any]:
+        return await self._api_get("/drive/explorer/v2/root_folder/meta")
+
+    async def search_docs(self, search_key: str, page_size: int = 5) -> Dict[str, Any]:
+        return await self._api_post("/suite/docs-api/search/object", {
+            "search_key": search_key, "page_size": page_size,
+        })
+
+    async def get_vc_rooms(self, page_size: int = 10) -> Dict[str, Any]:
+        return await self._api_get("/vc/v1/rooms", {"page_size": page_size})
+
+    async def get_attendance_shifts(self, page_size: int = 10) -> Dict[str, Any]:
+        return await self._api_get("/attendance/v1/shifts", {"page_size": page_size})
+
+    async def get_im_chats(self, page_size: int = 10) -> Dict[str, Any]:
+        return await self._api_get("/im/v1/chats", {"page_size": page_size})
+
+    async def get_available_capabilities(self) -> Dict[str, Any]:
+        if not self.is_configured():
+            return {"available": [], "unavailable": [], "mode": "not_configured"}
+
+        capabilities = [
+            ("bot_info", "Bot Info", "/bot/v3/info/"),
+            ("calendar", "Calendar Primary", "/calendar/v4/calendars/primary"),
+            ("calendar_events", "Calendar Events", "/calendar/v4/calendars/primary/events"),
+            ("contact_users", "Contact Users", "/contact/v3/users"),
+            ("task_list", "Task List", "/task/v2/tasks"),
+            ("drive_root", "Drive Root", "/drive/explorer/v2/root_folder/meta"),
+            ("doc_search", "Doc Search", "/suite/docs-api/search/object"),
+            ("vc_rooms", "VC Rooms", "/vc/v1/rooms"),
+            ("attendance", "Attendance Shifts", "/attendance/v1/shifts"),
+            ("im_chats", "IM Chats", "/im/v1/chats"),
+            ("bitable", "Bitable Query", "/bitable/v1/apps"),
+            ("doc_create", "Doc Create", "/docx/v1/documents"),
+            ("im_send", "IM Send Message", "/im/v1/messages"),
+        ]
+
+        available = []
+        unavailable = []
+        token = await self.get_tenant_access_token()
+        if not token:
+            return {"available": [], "unavailable": capabilities, "mode": "no_token"}
+
+        headers = {"Authorization": f"Bearer {token}"}
+        for cap_id, cap_name, path in capabilities:
+            try:
+                async with httpx.AsyncClient(timeout=5.0) as client:
+                    if cap_id in ("doc_search",):
+                        resp = await client.post(
+                            f"{self.base_url}{path}",
+                            headers=headers,
+                            json={"search_key": "test", "page_size": 1},
+                        )
+                    else:
+                        resp = await client.get(
+                            f"{self.base_url}{path}",
+                            headers=headers,
+                            params={"page_size": 1},
+                        )
+                    data = resp.json()
+                    if data.get("code") == 0:
+                        available.append({"id": cap_id, "name": cap_name, "path": path})
+                    else:
+                        unavailable.append({"id": cap_id, "name": cap_name, "reason": data.get("msg", "")[:40]})
+            except Exception:
+                unavailable.append({"id": cap_id, "name": cap_name, "reason": "timeout"})
+
+        return {
+            "available": available,
+            "unavailable": unavailable,
+            "total_available": len(available),
+            "total_capabilities": len(capabilities),
+            "mode": "production",
         }
 
 

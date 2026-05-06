@@ -12,6 +12,7 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import os
 import re
 import time
 import uuid
@@ -20,6 +21,8 @@ from typing import Dict, List, Any, Optional, Set, Tuple
 from dataclasses import dataclass, field
 
 logger = logging.getLogger("agent_system")
+
+_STATE_FILE = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "owasp_state.json")
 
 
 # ============================================================================
@@ -297,12 +300,18 @@ def verify_memory_integrity() -> Dict[str, Any]:
             verified.append(mem_key)
 
     chain_valid = True
-    for i in range(1, len(_MEMORY_HASH_CHAIN)):
-        prev = _MEMORY_STORE.get(list(_MEMORY_STORE.keys())[0], {})
-        if i < len(_MEMORY_STORE):
-            expected = hashlib.sha256(
-                (_MEMORY_HASH_CHAIN[i - 1] + list(_MEMORY_STORE.values())[i]["content_hash"]).encode()
-            ).hexdigest()
+    sorted_entries = sorted(_MEMORY_STORE.values(), key=lambda e: e.get("written_at", ""))
+    if len(sorted_entries) != len(_MEMORY_HASH_CHAIN):
+        chain_valid = False
+    else:
+        for i in range(len(_MEMORY_HASH_CHAIN)):
+            entry = sorted_entries[i]
+            if i == 0:
+                expected = entry["content_hash"]
+            else:
+                expected = hashlib.sha256(
+                    (_MEMORY_HASH_CHAIN[i - 1] + entry["content_hash"]).encode()
+                ).hexdigest()
             if _MEMORY_HASH_CHAIN[i] != expected:
                 chain_valid = False
                 break
@@ -726,6 +735,42 @@ def check_budget(agent_id: str) -> Dict[str, Any]:
         "monthly_usage_pct": round(monthly_usage * 100, 1),
         "action": "allow",
     }
+
+
+def save_state():
+    state = {
+        "agent_budgets": _AGENT_BUDGETS,
+        "global_budget": _GLOBAL_BUDGET,
+        "circuit_breakers": _CIRCUIT_BREAKERS,
+        "agent_health": _AGENT_HEALTH,
+        "tool_registry": _TOOL_REGISTRY,
+        "model_registry": _MODEL_REGISTRY,
+        "saved_at": datetime.now(timezone.utc).isoformat(),
+    }
+    try:
+        with open(_STATE_FILE, "w", encoding="utf-8") as f:
+            json.dump(state, f, ensure_ascii=False, indent=2)
+        logger.info("OWASP state saved to %s", _STATE_FILE)
+    except Exception as e:
+        logger.warning("Failed to save OWASP state: %s", e)
+
+
+def load_state():
+    global _AGENT_BUDGETS, _GLOBAL_BUDGET, _CIRCUIT_BREAKERS, _AGENT_HEALTH, _TOOL_REGISTRY, _MODEL_REGISTRY
+    if not os.path.exists(_STATE_FILE):
+        return
+    try:
+        with open(_STATE_FILE, "r", encoding="utf-8") as f:
+            state = json.load(f)
+        _AGENT_BUDGETS.update(state.get("agent_budgets", {}))
+        _GLOBAL_BUDGET.update(state.get("global_budget", {}))
+        _CIRCUIT_BREAKERS.update(state.get("circuit_breakers", {}))
+        _AGENT_HEALTH.update(state.get("agent_health", {}))
+        _TOOL_REGISTRY.update(state.get("tool_registry", {}))
+        _MODEL_REGISTRY.update(state.get("model_registry", {}))
+        logger.info("OWASP state loaded from %s", _STATE_FILE)
+    except Exception as e:
+        logger.warning("Failed to load OWASP state: %s", e)
 
 
 def get_cost_report(agent_id: Optional[str] = None) -> Dict[str, Any]:

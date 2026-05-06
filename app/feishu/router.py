@@ -1,4 +1,4 @@
-﻿import json
+import json
 import os
 import time
 import logging
@@ -82,6 +82,7 @@ def _log_feishu_event(event_type: str, user_id: str, message: str, result: Dict[
 
 _processed_messages: Dict[str, float] = {}
 _MESSAGE_TTL = 300
+_message_lock = asyncio.Lock()
 
 
 async def _process_feishu_message(user_id: str, message: str, chat_id: str = "", message_id: str = ""):
@@ -89,38 +90,56 @@ async def _process_feishu_message(user_id: str, message: str, chat_id: str = "",
     now = time.time()
     _processed_messages = {k: v for k, v in _processed_messages.items() if now - v < _MESSAGE_TTL}
 
-    if message_id and message_id in _processed_messages:
-        _logger.info("Skipping duplicate message: %s", message_id)
-        return {"status": "skipped", "content": "duplicate", "reason": "already processed"}
+    async with _message_lock:
+        dedup_key = message_id if message_id else f"{user_id}:{message[:100]}:{int(now / 30)}"
+        if dedup_key in _processed_messages:
+            _logger.info("Skipping duplicate message: %s", dedup_key)
+            return {"status": "skipped", "content": "duplicate", "reason": "already processed"}
 
-    if message_id:
-        _processed_messages[message_id] = now
+        _processed_messages[dedup_key] = now
 
     client = get_feishu_client()
+
+    if message.strip().startswith("/cli"):
+        return await _process_cli_command(user_id, message, chat_id, client)
 
     try:
         p_req = PlatformRequest(platform="feishu", user_id=user_id, message=message)
         result = run_task_with_alignment(platform_request=p_req)
         _log_feishu_event("message", user_id, message, result)
 
-        reply_content = result.get("content", "处理完成")
+        reply_content = _format_feishu_reply(result)
 
-        if result.get("status") == "success" and result.get("data"):
-            if chat_id:
-                await client.send_message(chat_id, reply_content, receive_id_type="chat_id")
-            else:
-                await client.send_message(user_id, reply_content)
+        if chat_id:
+            await client.send_message(chat_id, reply_content, receive_id_type="chat_id")
         else:
-            if chat_id:
-                await client.send_message(chat_id, reply_content, receive_id_type="chat_id")
-            else:
-                await client.send_message(user_id, reply_content)
+            await client.send_message(user_id, reply_content)
 
         _logger.info("Feishu message processed: user=%s status=%s", user_id, result.get("status"))
         return result
 
     except Exception as e:
         _logger.error("Error processing feishu message: %s", e, exc_info=True)
+
+        try:
+            from app.audit import log_event as audit_log_event
+            audit_log_event(
+                action="feishu:message:error",
+                resource="feishu:webhook",
+                decision="deny",
+                reason=f"feishu message processing error: {str(e)[:200]}",
+                agent_id="system",
+                context={
+                    "user_id": user_id,
+                    "message": message[:100],
+                    "platform": "feishu",
+                    "error": str(e)[:200],
+                    "source": "feishu_webhook_error",
+                },
+            )
+        except Exception:
+            pass
+
         error_msg = f"❌ 系统处理异常\n原因：{str(e)}"
         try:
             if chat_id:
@@ -130,6 +149,228 @@ async def _process_feishu_message(user_id: str, message: str, chat_id: str = "",
         except Exception:
             pass
         return {"status": "error", "content": error_msg, "reason": str(e)}
+
+
+async def _process_cli_command(user_id: str, message: str, chat_id: str, client) -> Dict[str, Any]:
+    from .cli_proxy import execute_cli_command, check_cli_permission
+
+    parts = message.strip().split()
+    if len(parts) < 2:
+        help_text = (
+            "🖥️ CLI IAM Gateway 使用说明\n\n"
+            "格式：/cli <domain> [subcommand] [args...]\n\n"
+            "示例：\n"
+            "  /cli calendar +agenda\n"
+            "  /cli base +table-list --base-token xxx\n"
+            "  /cli im +chat-search --query test\n"
+            "  /cli task +get-my-tasks\n"
+            "  /cli wiki spaces list\n\n"
+            "🔍 检查权限（不执行）：\n"
+            "  /cli check calendar +agenda\n\n"
+            "📊 查看CLI域：\n"
+            "  /cli domains\n\n"
+            "🔐 所有CLI命令均经过IAM网关管控"
+        )
+        if chat_id:
+            await client.send_message(chat_id, help_text, receive_id_type="chat_id")
+        else:
+            await client.send_message(user_id, help_text)
+        return {"status": "success", "content": help_text}
+
+    if parts[1] == "domains":
+        from .cli_proxy import get_cli_domain_capabilities
+        caps = get_cli_domain_capabilities()
+        lines = ["📋 CLI IAM Domain Capabilities\n"]
+        for k, v in caps.items():
+            risk = "🔴HIGH" if v["is_high_risk"] else ("🟡MED" if v["is_sensitive"] else "🟢LOW")
+            lines.append(f"  {k} ({risk}): {len(v['commands'])} commands")
+        reply = "\n".join(lines)
+        if chat_id:
+            await client.send_message(chat_id, reply, receive_id_type="chat_id")
+        else:
+            await client.send_message(user_id, reply)
+        return {"status": "success", "content": reply}
+
+    if parts[1] == "check":
+        if len(parts) < 3:
+            reply = "格式：/cli check <domain> [subcommand]"
+            if chat_id:
+                await client.send_message(chat_id, reply, receive_id_type="chat_id")
+            else:
+                await client.send_message(user_id, reply)
+            return {"status": "success", "content": reply}
+        domain = parts[2]
+        subcommand = parts[3] if len(parts) > 3 else ""
+        perm = check_cli_permission("doc_agent", domain, subcommand)
+        icon = "✅" if perm["allowed"] else "❌"
+        reply = f"{icon} CLI IAM Check\n  domain: {domain}\n  subcommand: {subcommand}\n  action: {perm['action']}\n  allowed: {perm['allowed']}\n  trust: {perm.get('trust_score', 'N/A')}\n  blocked_at: {perm.get('blocked_at', '-')}"
+        if chat_id:
+            await client.send_message(chat_id, reply, receive_id_type="chat_id")
+        else:
+            await client.send_message(user_id, reply)
+        return {"status": "success", "content": reply}
+
+    domain = parts[1]
+    subcommand = parts[2] if len(parts) > 2 else ""
+    args = parts[3:] if len(parts) > 3 else []
+
+    result = await execute_cli_command(
+        domain=domain,
+        subcommand=subcommand,
+        args=args,
+        agent_id="doc_agent",
+    )
+
+    if result.iam_allowed:
+        icon = "✅"
+        reply_lines = [
+            f"{icon} CLI IAM ALLOWED",
+            f"  domain: {result.domain}",
+            f"  subcommand: {result.subcommand}",
+            f"  action: {result.action}",
+            f"  trust: {result.trust_score:.2f}" if result.trust_score else "  trust: N/A",
+            "",
+            "--- CLI Output ---",
+        ]
+        output = result.output.strip()
+        if output:
+            try:
+                parsed = json.loads(output)
+                reply_lines.append(json.dumps(parsed, indent=2, ensure_ascii=False)[:1500])
+            except (json.JSONDecodeError, TypeError):
+                reply_lines.append(output[:1500])
+        else:
+            reply_lines.append("(no output)")
+    else:
+        icon = "❌"
+        reply_lines = [
+            f"{icon} CLI IAM BLOCKED",
+            f"  domain: {result.domain}",
+            f"  subcommand: {result.subcommand}",
+            f"  action: {result.action}",
+            f"  blocked_at: {result.iam_blocked_at}",
+            f"  reason: {result.iam_reason[:100]}",
+            f"  trust: {result.trust_score:.2f}" if result.trust_score else "  trust: N/A",
+        ]
+
+    reply = "\n".join(reply_lines)
+    _log_feishu_event("cli_command", user_id, message, {
+        "status": "success" if result.iam_allowed else "denied",
+        "domain": result.domain,
+        "action": result.action,
+        "iam_allowed": result.iam_allowed,
+        "iam_blocked_at": result.iam_blocked_at,
+    })
+
+    if chat_id:
+        await client.send_message(chat_id, reply, receive_id_type="chat_id")
+    else:
+        await client.send_message(user_id, reply)
+
+    return {"status": "success" if result.iam_allowed else "denied", "content": reply}
+
+
+def _format_feishu_reply(result: Dict[str, Any]) -> str:
+    status = result.get("status", "unknown")
+    content = result.get("content", "")
+    chain = result.get("chain", [])
+    capability = result.get("capability", "")
+    trust_score = result.get("trust_score")
+    blocked_at = result.get("blocked_at", "")
+    auto_revoked = result.get("auto_revoked", False)
+    attack_type = result.get("attack_type")
+    prompt_risk = result.get("prompt_risk", {})
+    alignment = result.get("alignment", {})
+    six_layer = result.get("six_layer")
+    platform_risk = result.get("platform_risk", 0)
+    data = result.get("data")
+
+    lines = []
+
+    if status == "success":
+        lines.append("✅ 操作成功")
+    elif status == "denied":
+        lines.append("❌ 请求被拒绝")
+    elif status == "auto_revoked":
+        lines.append("🔥 Agent 已被自动封禁")
+    elif status == "hitl_pending":
+        lines.append("⏳ 人工审批中")
+    elif status == "alignment_blocked":
+        lines.append("🛡️ 输出对齐检查未通过")
+    else:
+        lines.append(f"⚠️ {status}")
+
+    if content:
+        clean = content.replace("✅ 操作成功", "").replace("❌ 请求被拒绝", "").strip()
+        if clean:
+            lines.append("")
+            lines.append(clean)
+
+    lines.append("")
+    lines.append("--- 安全链路证据 ---")
+
+    if chain:
+        lines.append(f"🔗 Chain: {' → '.join(chain)}")
+
+    if capability:
+        lines.append(f"🔐 Capability: {capability}")
+
+    if trust_score is not None:
+        trust_emoji = "🟢" if trust_score >= 0.7 else ("🟡" if trust_score >= 0.5 else "🔴")
+        trust_line = f"🏆 Trust: {trust_emoji} {trust_score:.2f}"
+        trust_before = result.get("trust_before")
+        trust_after = result.get("trust_after")
+        if trust_before is not None and trust_after is not None and trust_before != trust_after:
+            trust_line += f" ({trust_before:.2f}→{trust_after:.2f})"
+        lines.append(trust_line)
+
+    if blocked_at:
+        lines.append(f"🚫 Blocked@: {blocked_at}")
+
+    if auto_revoked:
+        lines.append("🔥 Auto-Revoked: YES")
+
+    if attack_type:
+        lines.append(f"⚔️ Attack: {attack_type}")
+
+    if prompt_risk and isinstance(prompt_risk, dict):
+        risk_score = prompt_risk.get("risk_score", 0)
+        threats = prompt_risk.get("threats", [])
+        if risk_score > 0:
+            lines.append(f"🧠 Prompt Risk: {risk_score:.2f}")
+        if threats:
+            lines.append(f"⚠️ Threats: {', '.join(threats[:3])}")
+
+    if platform_risk > 0:
+        lines.append(f"📱 Platform Risk: {platform_risk:.2f}")
+
+    if alignment and alignment.get("checked"):
+        al_action = alignment.get("action", "pass")
+        al_risk = alignment.get("risk_score", 0)
+        al_icon = "🛡️" if al_action == "block" else ("⚠️" if al_action == "warn" else "✅")
+        lines.append(f"{al_icon} Alignment: {al_action.upper()} (risk: {al_risk:.2f})")
+
+    if six_layer and isinstance(six_layer, dict):
+        layers = six_layer.get("layers", {})
+        if layers and isinstance(layers, dict):
+            layer_summary = []
+            for lid, ldata in layers.items():
+                if isinstance(ldata, dict):
+                    lst = ldata.get("status", "pass")
+                else:
+                    lst = str(ldata)
+                icon = "✔" if lst == "pass" else ("⚠" if lst == "warn" else "✘")
+                layer_summary.append(f"{icon}{lid}")
+            lines.append(f"🧱 6-Layer: {' '.join(layer_summary)}")
+
+    if data and isinstance(data, dict):
+        source = data.get("source", "")
+        if source:
+            lines.append(f"📊 Data Source: {source}")
+
+    lines.append("🔐 Audit: logged")
+
+    return "\n".join(lines)
 
 
 @router.post("/webhook")
@@ -152,6 +393,14 @@ async def feishu_webhook(body: Dict[str, Any], background_tasks: BackgroundTasks
     message = parsed["message"]
     chat_id = parsed.get("chat_id", "")
     message_id = parsed.get("message_id", "")
+
+    async with _message_lock:
+        now = time.time()
+        dedup_key = message_id if message_id else f"{user_id}:{message[:100]}:{int(now / 30)}"
+        if dedup_key in _processed_messages:
+            _logger.info("Webhook duplicate skipped: %s", dedup_key)
+            return {"code": 0, "msg": "duplicate"}
+        _processed_messages[dedup_key] = now
 
     _logger.info("Feishu webhook: user=%s message='%s'", user_id, message[:50])
 
@@ -179,6 +428,12 @@ async def feishu_test_endpoint(req: FeishuTestRequest):
         "platform": result.get("platform", req.platform),
         "platform_risk": result.get("platform_risk"),
     }
+    if result.get("doc_url"):
+        response["doc_url"] = result.get("doc_url")
+    if result.get("trust_before") is not None:
+        response["trust_before"] = result.get("trust_before")
+    if result.get("trust_after") is not None:
+        response["trust_after"] = result.get("trust_after")
     if result.get("steps"):
         response["steps"] = result.get("steps")
     return response
@@ -207,64 +462,80 @@ async def get_feishu_events(limit: int = 50):
 @router.get("/status")
 async def feishu_status():
     client = get_feishu_client()
+    ws_connected = False
+    try:
+        from app.feishu.ws_client import is_ws_connected
+        ws_connected = is_ws_connected()
+    except Exception:
+        pass
     return {
         "configured": client.is_configured(),
         "app_id_set": bool(client.app_id),
         "app_secret_set": bool(client.app_secret),
         "verification_token_set": bool(client.verification_token),
         "mode": "production" if client.is_configured() else "mock",
+        "ws_long_connection": ws_connected,
+        "connection_mode": "websocket" if ws_connected else ("webhook+ngrok" if client.is_configured() else "mock"),
         "total_events": len(_feishu_event_log),
     }
 
 
+@router.get("/capabilities")
+async def feishu_capabilities():
+    client = get_feishu_client()
+    return await client.get_available_capabilities()
+
+
+@router.get("/calendar/events")
+async def feishu_calendar_events(page_size: int = 10):
+    client = get_feishu_client()
+    return await client.get_calendar_events(page_size=page_size)
+
+
+@router.get("/contacts")
+async def feishu_contacts(page_size: int = 10):
+    client = get_feishu_client()
+    return await client.get_contact_users(page_size=page_size)
+
+
+@router.get("/tasks")
+async def feishu_tasks(page_size: int = 10):
+    client = get_feishu_client()
+    return await client.get_task_list(page_size=page_size)
+
+
+@router.get("/vc/rooms")
+async def feishu_vc_rooms(page_size: int = 10):
+    client = get_feishu_client()
+    return await client.get_vc_rooms(page_size=page_size)
+
+
+@router.get("/drive/root")
+async def feishu_drive_root():
+    client = get_feishu_client()
+    return await client.get_drive_root()
+
+
+@router.post("/docs/search")
+async def feishu_docs_search(search_key: str = "test", page_size: int = 5):
+    client = get_feishu_client()
+    return await client.search_docs(search_key=search_key, page_size=page_size)
+
+
+@router.get("/attendance/shifts")
+async def feishu_attendance_shifts(page_size: int = 10):
+    client = get_feishu_client()
+    return await client.get_attendance_shifts(page_size=page_size)
+
+
+@router.get("/im/chats")
+async def feishu_im_chats(page_size: int = 10):
+    client = get_feishu_client()
+    return await client.get_im_chats(page_size=page_size)
+
+
 @router.post("/connect")
 async def feishu_connect():
-    import subprocess
-    import httpx as sync_httpx
-
-    from main import _ngrok_url
-
-    ngrok_url = _ngrok_url
-    ngrok_started = False
-
-    if not ngrok_url:
-        try:
-            ngrok_procs = subprocess.run(
-                ["tasklist", "/FI", "IMAGENAME eq ngrok.exe"],
-                capture_output=True, text=True, timeout=5,
-            )
-            if "ngrok.exe" not in ngrok_procs.stdout:
-                subprocess.Popen(
-                    ["ngrok", "http", "8000"],
-                    stdout=subprocess.DEVNULL,
-                    stderr=subprocess.DEVNULL,
-                    creationflags=0x00000008 if os.name == "nt" else 0,
-                )
-                ngrok_started = True
-                await asyncio.sleep(4)
-
-            for _ in range(10):
-                try:
-                    resp = await asyncio.to_thread(
-                        sync_httpx.get, "http://127.0.0.1:4040/api/tunnels", timeout=3
-                    )
-                    data = resp.json()
-                    for t in data.get("tunnels", []):
-                        if t.get("proto") == "https":
-                            ngrok_url = t["public_url"]
-                            break
-                    if ngrok_url:
-                        break
-                except Exception:
-                    await asyncio.sleep(1)
-        except Exception as e:
-            _logger.warning("Ngrok start failed: %s", e)
-
-    if ngrok_url:
-        import main as main_mod
-        main_mod._ngrok_url = ngrok_url
-        os.environ["FEISHU_PUBLIC_URL"] = ngrok_url
-
     client = get_feishu_client()
     token_ok = False
     if client.is_configured():
@@ -274,15 +545,19 @@ async def feishu_connect():
         except Exception:
             pass
 
-    webhook_url = f"{ngrok_url}/api/feishu/webhook" if ngrok_url else ""
+    ws_connected = False
+    try:
+        from app.feishu.ws_client import is_ws_connected
+        ws_connected = is_ws_connected()
+    except Exception:
+        pass
 
     return {
         "connected": client.is_configured() and token_ok,
         "mode": "production" if client.is_configured() else "mock",
         "token_ok": token_ok,
-        "ngrok_url": ngrok_url,
-        "ngrok_started": ngrok_started,
-        "webhook_url": webhook_url,
+        "ws_long_connection": ws_connected,
+        "connection_mode": "websocket" if ws_connected else ("webhook+ngrok" if client.is_configured() else "mock"),
     }
 
 
@@ -409,3 +684,238 @@ async def feishu_demo_auto_revoke():
 
     _log_feishu_event("demo_auto_revoke", user_id, "auto revoke demo", response)
     return response
+
+
+class CLIExecuteRequest(BaseModel):
+    domain: str
+    subcommand: str = ""
+    args: list = []
+    agent_id: str = "doc_agent"
+    method: str = "GET"
+    dry_run: bool = False
+
+
+class CLICheckRequest(BaseModel):
+    domain: str
+    subcommand: str = ""
+    agent_id: str = "doc_agent"
+    method: str = "GET"
+
+
+@router.get("/cli/domains")
+async def cli_domains():
+    from .cli_proxy import get_cli_domain_capabilities
+    return {"domains": get_cli_domain_capabilities(), "title": "Feishu CLI IAM Domain Capabilities"}
+
+
+@router.post("/cli/check")
+async def cli_check(req: CLICheckRequest):
+    from .cli_proxy import check_cli_permission
+    return check_cli_permission(req.agent_id, req.domain, req.subcommand, req.method)
+
+
+@router.post("/cli/execute")
+async def cli_execute(req: CLIExecuteRequest):
+    from .cli_proxy import execute_cli_command
+    result = await execute_cli_command(
+        domain=req.domain,
+        subcommand=req.subcommand,
+        args=req.args,
+        agent_id=req.agent_id,
+        method=req.method,
+        dry_run=req.dry_run,
+    )
+    return {
+        "success": result.success,
+        "output": result.output,
+        "exit_code": result.exit_code,
+        "iam_allowed": result.iam_allowed,
+        "iam_decision": result.iam_decision,
+        "iam_reason": result.iam_reason,
+        "iam_blocked_at": result.iam_blocked_at,
+        "trust_score": result.trust_score,
+        "risk_score": result.risk_score,
+        "agent_id": result.agent_id,
+        "action": result.action,
+        "domain": result.domain,
+        "subcommand": result.subcommand,
+        "latency_ms": round(result.latency_ms, 2),
+        "auto_revoked": result.auto_revoked,
+        "six_layer": result.six_layer,
+    }
+
+
+@router.get("/cli/audit")
+async def cli_audit(limit: int = 50):
+    from .cli_proxy import get_cli_audit_log
+    return {"audit": get_cli_audit_log(limit), "total": len(get_cli_audit_log(9999))}
+
+
+@router.get("/cli/stats")
+async def cli_stats():
+    from .cli_proxy import get_cli_stats
+    from .iam_gateway import get_gateway_stats
+    return {
+        "cli_stats": get_cli_stats(),
+        "iam_gateway_stats": get_gateway_stats(),
+    }
+
+
+@router.post("/cli/demo/blocked")
+async def cli_demo_blocked():
+    from .cli_proxy import execute_cli_command
+    result = await execute_cli_command(
+        domain="base",
+        subcommand="+record-list",
+        args=["--base-token", "ZaJ3bqnLOaKW4QscFyRc001GnSf", "--table-id", "tblkLoMhXCeVtchv"],
+        agent_id="external_agent",
+    )
+    return {
+        "title": "CLI IAM Demo: External Agent Blocked",
+        "title_cn": "CLI管控演示：外部Agent被拦截",
+        "scenario": "external_agent tries to read finance table via CLI",
+        "scenario_cn": "外部Agent通过CLI尝试读取财务数据",
+        "result": {
+            "success": result.success,
+            "iam_allowed": result.iam_allowed,
+            "iam_decision": result.iam_decision,
+            "iam_reason": result.iam_reason,
+            "iam_blocked_at": result.iam_blocked_at,
+            "trust_score": result.trust_score,
+            "risk_score": result.risk_score,
+            "action": result.action,
+            "auto_revoked": result.auto_revoked,
+        },
+    }
+
+
+@router.post("/cli/demo/allowed")
+async def cli_demo_allowed():
+    from .cli_proxy import execute_cli_command
+    result = await execute_cli_command(
+        domain="calendar",
+        subcommand="+agenda",
+        agent_id="doc_agent",
+    )
+    return {
+        "title": "CLI IAM Demo: Doc Agent Allowed",
+        "title_cn": "CLI管控演示：文档Agent被放行",
+        "scenario": "doc_agent reads calendar via CLI",
+        "scenario_cn": "文档Agent通过CLI读取日历",
+        "result": {
+            "success": result.success,
+            "iam_allowed": result.iam_allowed,
+            "iam_decision": result.iam_decision,
+            "iam_reason": result.iam_reason,
+            "trust_score": result.trust_score,
+            "risk_score": result.risk_score,
+            "action": result.action,
+        },
+    }
+
+
+@router.post("/cli/demo/escalation")
+async def cli_demo_escalation():
+    from .cli_proxy import execute_cli_command
+    steps = []
+    actions = [
+        ("im", "+messages-send", "write:feishu_message", "doc_agent", "正常发送消息"),
+        ("base", "+record-list", "read:bitable", "doc_agent", "读取多维表格"),
+        ("base", "+record-list", "read:bitable", "external_agent", "外部Agent越权读取"),
+        ("approval", "instances", "read:approval", "external_agent", "外部Agent越权审批"),
+    ]
+    for domain, subcmd, expected_action, agent, desc in actions:
+        result = await execute_cli_command(
+            domain=domain,
+            subcommand=subcmd,
+            agent_id=agent,
+        )
+        steps.append({
+            "domain": domain,
+            "subcommand": subcmd,
+            "expected_action": expected_action,
+            "agent_id": agent,
+            "description": desc,
+            "description_cn": desc,
+            "iam_allowed": result.iam_allowed,
+            "iam_decision": result.iam_decision,
+            "iam_reason": result.iam_reason,
+            "iam_blocked_at": result.iam_blocked_at,
+            "trust_score": result.trust_score,
+            "risk_score": result.risk_score,
+            "auto_revoked": result.auto_revoked,
+        })
+
+    blocked = sum(1 for s in steps if not s["iam_allowed"])
+    total = len(steps)
+    return {
+        "title": "CLI IAM Escalation Test",
+        "title_cn": "CLI管控越权测试",
+        "statement": "Every CLI command passes through IAM Gateway before execution",
+        "statement_cn": "每条CLI命令执行前必须经过IAM网关检查",
+        "total_steps": total,
+        "blocked": blocked,
+        "allowed": total - blocked,
+        "pass_rate": f"{blocked}/{total}",
+        "all_boundary_held": blocked > 0,
+        "steps": steps,
+    }
+
+
+def _run_async(coro):
+    try:
+        loop = asyncio.get_event_loop()
+        if loop.is_running():
+            import concurrent.futures
+            with concurrent.futures.ThreadPoolExecutor() as pool:
+                future = pool.submit(asyncio.run, coro)
+                return future.result(timeout=30)
+        else:
+            return loop.run_until_complete(coro)
+    except RuntimeError:
+        return asyncio.run(coro)
+
+
+def _process_feishu_message_sync(user_id: str, message: str, chat_id: str = "", message_id: str = ""):
+    global _processed_messages
+    now = time.time()
+    _processed_messages = {k: v for k, v in _processed_messages.items() if now - v < _MESSAGE_TTL}
+
+    dedup_key = message_id if message_id else f"{user_id}:{message[:100]}:{int(now / 30)}"
+    if dedup_key in _processed_messages:
+        _logger.info("WS Skipping duplicate message: %s", dedup_key)
+        return {"status": "skipped", "content": "duplicate", "reason": "already processed"}
+    _processed_messages[dedup_key] = now
+
+    try:
+        client = get_feishu_client()
+        if message.strip().startswith("/cli"):
+            try:
+                result = _run_async(_process_cli_command(user_id, message, chat_id, client))
+                return result
+            except Exception as e:
+                _logger.error("CLI command error: %s", e, exc_info=True)
+                return {"status": "error", "content": str(e)}
+
+        p_req = PlatformRequest(platform="feishu", user_id=user_id, message=message)
+        result = run_task_with_alignment(platform_request=p_req)
+        _log_feishu_event("ws_message", user_id, message, result)
+
+        reply_content = _format_feishu_reply(result)
+
+        try:
+            _run_async(client.send_message(chat_id or user_id, reply_content, receive_id_type="chat_id" if chat_id else "open_id"))
+        except Exception as send_err:
+            _logger.warning("Failed to send feishu reply: %s", send_err)
+
+        _logger.info("Feishu WS message processed: user=%s status=%s", user_id, result.get("status"))
+        return result
+
+    except Exception as e:
+        _logger.error("Error processing feishu WS message: %s", e, exc_info=True)
+        try:
+            error_msg = f"❌ 系统处理异常\n原因：{str(e)}"
+            _run_async(client.send_message(chat_id or user_id, error_msg, receive_id_type="chat_id" if chat_id else "open_id"))
+        except Exception:
+            pass
+        return {"status": "error", "content": str(e)}

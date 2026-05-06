@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿var FS = (function() {
+﻿﻿﻿﻿﻿﻿var FS = (function() {
     var BASE = '/api/feishu';
     var DELEGATE_BASE = '/api/delegate';
     var GOV_BASE = '/api/governance';
@@ -559,17 +559,33 @@
     refresh();
 
     var _autoConnected = false;
+    var _wsRetryCount = 0;
+    var _wsMaxRetries = 6;
 
     function _autoConnect() {
         var btn = document.getElementById('btnConnect');
         if (btn) { btn.textContent = '⏳ 自动连接中...'; btn.disabled = true; }
-        fetchJSON(BASE + '/connect', { method: 'POST' })
+        fetchJSON(BASE + '/status')
             .then(function(data) {
-                var ngrokUrl = data.ngrok_url || '';
-                var connected = data.connected;
+                var wsConnected = data.ws_long_connection;
+                var configured = data.configured;
+                var connectionMode = data.connection_mode;
 
-                if (connected && ngrokUrl) {
-                    _onConnected(ngrokUrl, data.webhook_url, true, true);
+                if (wsConnected) {
+                    _onWSConnected(true, true);
+                } else if (configured) {
+                    var modeEl = document.getElementById('statMode');
+                    if (modeEl) { modeEl.textContent = 'WS⏳'; modeEl.style.color = '#fbbf24'; }
+                    if (btn) {
+                        btn.textContent = '🔄 重连WS';
+                        btn.disabled = false;
+                    }
+                    addChatMsg('bot', '<div style="font-size:0.72rem;color:#fbbf24">飞书已配置，WebSocket长连接建立中...</div>', { status: 'info' });
+                    _autoConnected = true;
+                    if (_wsRetryCount < _wsMaxRetries) {
+                        _wsRetryCount++;
+                        setTimeout(_autoConnect, 3000);
+                    }
                 } else {
                     var modeEl = document.getElementById('statMode');
                     if (modeEl) { modeEl.textContent = 'MOCK'; modeEl.style.color = '#fbbf24'; }
@@ -591,29 +607,26 @@
             });
     }
 
-    function _onConnected(ngrokUrl, webhookUrl, isProd, isAuto) {
+    function _onWSConnected(isProd, isAuto) {
         var btn = document.getElementById('btnConnect');
         var modeEl = document.getElementById('statMode');
 
-        if (ngrokUrl) {
-            var html = '<div style="font-size:0.78rem;font-weight:700;color:#34d399;margin-bottom:8px">✅ 飞书公网连接已就绪</div>';
-            html += '<div style="font-size:0.7rem;color:#3a3a3c;margin-bottom:4px">公网地址：<span style="color:#64d2ff">' + ngrokUrl + '</span></div>';
-            html += '<div style="border-top:1px solid rgba(0,0,0,0.08);padding-top:6px;margin-top:6px;font-size:0.68rem;color:#636366">Webhook：' + webhookUrl + '</div>';
-            if (isProd) {
-                html += '<div style="border-top:1px solid rgba(0,0,0,0.08);padding-top:6px;margin-top:6px;font-size:0.68rem;color:#34d399">👉 飞书机器人已就绪，可在飞书群 @机器人 发消息测试</div>';
-            }
+        if (isProd) {
+            var html = '<div style="font-size:0.78rem;font-weight:700;color:#34d399;margin-bottom:8px">✅ 飞书WebSocket长连接已就绪</div>';
+            html += '<div style="font-size:0.7rem;color:#3a3a3c;margin-bottom:4px">连接模式：<span style="color:#6366f1;font-weight:600">WebSocket 长连接</span>（无需公网暴露）</div>';
+            html += '<div style="border-top:1px solid rgba(0,0,0,0.08);padding-top:6px;margin-top:6px;font-size:0.68rem;color:#34d399">👉 飞书机器人已就绪，可在飞书群 @机器人 发消息测试</div>';
             addChatMsg('bot', html, { status: 'success' });
         }
 
         if (btn && isProd) {
-            btn.textContent = '✅ 已连接';
+            btn.textContent = '✅ WS已连接';
             btn.style.background = 'rgba(52,211,153,0.12)';
             btn.style.color = '#059669';
             btn.style.border = '1px solid rgba(52,211,153,0.3)';
         }
         if (modeEl && isProd) {
-            modeEl.textContent = 'PROD';
-            modeEl.style.color = '#34d399';
+            modeEl.textContent = 'WS';
+            modeEl.style.color = '#6366f1';
         }
         _autoConnected = true;
     }
@@ -623,14 +636,36 @@
         if (btn && !isAuto) { btn.disabled = true; btn.textContent = '⏳ 连接中...'; }
         if (isAuto && btn) { btn.textContent = '⏳ 自动连接中...'; btn.disabled = true; }
 
-        fetchJSON(BASE + '/connect', { method: 'POST' })
+        fetchJSON(BASE + '/status')
             .then(function(data) {
-                var connected = data.connected;
-                var ngrokUrl = data.ngrok_url || '';
-                var tokenOk = data.token_ok;
+                var wsConnected = data.ws_long_connection;
+                var configured = data.configured;
 
-                if (connected) {
-                    _onConnected(ngrokUrl, data.webhook_url, true, isAuto);
+                if (wsConnected) {
+                    _onWSConnected(true, isAuto);
+                } else if (configured) {
+                    var modeEl = document.getElementById('statMode');
+                    if (modeEl) { modeEl.textContent = 'WS⏳'; modeEl.style.color = '#fbbf24'; }
+
+                    if (!isAuto) {
+                        var html = '<div style="font-size:0.78rem;font-weight:700;color:#fbbf24;margin-bottom:8px">🟡 WebSocket长连接建立中</div>';
+                        html += '<div style="font-size:0.7rem;color:#3a3a3c;margin-bottom:4px">飞书配置：<span style="color:#34d399">✅ 已配置</span></div>';
+                        html += '<div style="font-size:0.7rem;color:#fbbf24;margin-bottom:4px">WebSocket长连接：<span style="color:#fbbf24">⏳ 建立中</span>（自动重试中）</div>';
+                        addChatMsg('bot', html, { status: 'info' });
+                    }
+
+                    if (btn) {
+                        btn.textContent = '🔄 重连WS';
+                        btn.style.background = '';
+                        btn.style.color = '';
+                        btn.style.border = '';
+                        btn.disabled = false;
+                    }
+                    _autoConnected = true;
+                    if (_wsRetryCount < _wsMaxRetries) {
+                        _wsRetryCount++;
+                        setTimeout(function() { _doConnect(true); }, 3000);
+                    }
                 } else {
                     var modeEl = document.getElementById('statMode');
                     if (modeEl) { modeEl.textContent = 'MOCK'; modeEl.style.color = '#fbbf24'; }
@@ -638,19 +673,12 @@
                     if (!isAuto) {
                         var html = '<div style="font-size:0.78rem;font-weight:700;color:#fbbf24;margin-bottom:8px">🟡 未连接飞书（Mock 模式）</div>';
                         html += '<div style="font-size:0.7rem;color:#3a3a3c;margin-bottom:4px">所有演示功能可直接使用</div>';
-                        if (tokenOk) {
-                            html += '<div style="font-size:0.7rem;color:#3a3a3c;margin-bottom:4px">飞书 Token：<span style="color:#34d399">✅ 有效</span></div>';
-                        } else {
-                            html += '<div style="font-size:0.7rem;color:#8e8e93;margin-bottom:4px">飞书 Token：<span style="color:#fbbf24">未配置</span>（配置 .env 后可连接真实飞书）</div>';
-                        }
-                        if (ngrokUrl) {
-                            html += '<div style="font-size:0.7rem;color:#3a3a3c;margin-bottom:4px">公网地址：<span style="color:#64d2ff">' + ngrokUrl + '</span></div>';
-                        }
+                        html += '<div style="font-size:0.7rem;color:#8e8e93;margin-bottom:4px">飞书配置：<span style="color:#fbbf24">未配置</span>（配置 .env 后可连接真实飞书）</div>';
                         addChatMsg('bot', html, { status: 'info' });
                     }
 
                     if (btn) {
-                        btn.textContent = '🟡 Mock 模式';
+                        btn.textContent = '🔄 重连WS';
                         btn.style.background = '';
                         btn.style.color = '';
                         btn.style.border = '';
@@ -1715,6 +1743,54 @@
         setTimeout(runNext, 600);
     }
 
+    function runAdversarialProbe() {
+        var btn = document.getElementById('btnAdversarial');
+        if (btn) { btn.disabled = true; btn.textContent = '...'; }
+        addChatMsg('user', 'Run Adversarial Agent Probe');
+
+        fetchJSON('/api/p2/adversarial/run-probes', { method: 'POST' })
+            .then(function(data) {
+                var html = '<div style="padding:16px 20px;border-radius:14px;background:linear-gradient(135deg,rgba(249,115,22,0.06),rgba(239,68,68,0.04));border:2px solid rgba(249,115,22,0.2);margin-top:8px">';
+                html += '<div style="font-size:0.92rem;font-weight:800;color:#f97316;margin-bottom:4px;text-align:center">Adversarial Agent: Built-in Attacker</div>';
+                html += '<div style="font-size:0.60rem;color:#8e8e93;text-align:center;margin-bottom:10px">' + (data.statement_cn || '') + '</div>';
+
+                var passIcon = data.all_boundaries_held ? '<span style="color:#34d399">&#10004;</span>' : '<span style="color:#ef4444">&#10008;</span>';
+                html += '<div style="text-align:center;margin-bottom:12px">';
+                html += '<span style="font-size:1.4rem;font-weight:900;color:' + (data.all_boundaries_held ? '#34d399' : '#ef4444') + '">' + data.pass_rate + '</span>';
+                html += '<span style="font-size:0.72rem;color:#8e8e93;margin-left:6px">probes blocked</span>';
+                html += ' ' + passIcon;
+                html += '</div>';
+
+                var results = data.results || [];
+                html += '<div style="padding:10px 12px;border-radius:8px;background:#d1d1d6;font-family:monospace;font-size:0.58rem;color:#636366;max-height:200px;overflow-y:auto;margin-bottom:10px">';
+                for (var i = 0; i < results.length; i++) {
+                    var r = results[i];
+                    var icon = r.actual_result === 'DENIED' ? '<span style="color:#34d399">&#10004;</span>' : '<span style="color:#ef4444">&#10008; LEAKED</span>';
+                    html += '<div style="margin-bottom:3px">' + icon + ' ' + r.probe_name_cn + ' [' + r.category + '] → ' + r.actual_result;
+                    if (r.actual_reason) html += ' <span style="color:#8e8e93">(' + r.actual_reason.substring(0, 40) + ')</span>';
+                    html += '</div>';
+                }
+                html += '</div>';
+
+                var cats = data.boundary_coverage || {};
+                html += '<div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:center">';
+                for (var cat in cats) {
+                    var c = cats[cat];
+                    var catColor = c.blocked === c.total ? '#34d399' : '#ef4444';
+                    html += '<span style="font-size:0.56rem;padding:3px 8px;border-radius:4px;background:' + catColor + '20;color:' + catColor + ';border:1px solid ' + catColor + '40">' + cat + ' ' + c.blocked + '/' + c.total + '</span>';
+                }
+                html += '</div>';
+
+                html += '</div>';
+                addChatMsg('bot', html, { status: 'success' });
+                if (btn) { btn.disabled = false; btn.textContent = 'Adversarial'; }
+            })
+            .catch(function(err) {
+                addChatMsg('bot', 'Adversarial probe error: ' + err.message, { status: 'error' });
+                if (btn) { btn.disabled = false; btn.textContent = 'Adversarial'; }
+            });
+    }
+
     function runKillerSummary() {
         var btn = document.getElementById('btnSummary');
         if (btn) { btn.disabled = true; btn.textContent = '⏳ 加载中...'; }
@@ -1809,6 +1885,48 @@
                 if (sup.performance_cn) { html += '<span style="font-size:0.6rem;color:#8e8e93">✔ ' + sup.performance_cn + '</span>'; }
                 html += '</div>';
 
+                if (data.value_metrics) {
+                    html += '<div style="margin-top:10px;padding:10px 14px;border-radius:8px;background:#f0fdf4;border:1px solid #bbf7d0">';
+                    html += '<div style="font-size:0.64rem;color:#166534;font-weight:600;margin-bottom:6px">' + (data.value_metrics.title_cn || '量化业务价值') + '</div>';
+                    var metrics = data.value_metrics.metrics || [];
+                    for (var mi = 0; mi < metrics.length; mi++) {
+                        var m = metrics[mi];
+                        html += '<div style="display:flex;align-items:baseline;gap:8px;margin-bottom:3px">';
+                        html += '<span style="font-size:0.56rem;color:#15803d;font-weight:600;min-width:90px">' + m.metric_cn + '</span>';
+                        html += '<span style="font-size:0.64rem;color:#166534;font-weight:700">' + m.value + '</span>';
+                        html += '<span style="font-size:0.52rem;color:#6b7280">' + (m.detail_cn || '') + '</span>';
+                        html += '</div>';
+                    }
+                    html += '</div>';
+                }
+
+                if (data.differentiation) {
+                    html += '<div style="margin-top:8px;padding:10px 14px;border-radius:8px;background:#eff6ff;border:1px solid #bfdbfe">';
+                    html += '<div style="font-size:0.64rem;color:#1e40af;font-weight:600;margin-bottom:6px">' + (data.differentiation.title_cn || '差异化对比') + '</div>';
+                    var comp = data.differentiation.comparison || [];
+                    for (var ci = 0; ci < comp.length; ci++) {
+                        var c = comp[ci];
+                        html += '<div style="margin-bottom:4px;font-size:0.54rem">';
+                        html += '<span style="color:#1e40af;font-weight:600">' + c.dimension_cn + '：</span>';
+                        html += '<span style="color:#dc2626;text-decoration:line-through">' + c.traditional_cn + '</span>';
+                        html += ' → ';
+                        html += '<span style="color:#16a34a;font-weight:600">' + c.agentpass_cn + '</span>';
+                        html += '</div>';
+                    }
+                    html += '</div>';
+                }
+
+                if (data.integration_cost) {
+                    html += '<div style="margin-top:8px;padding:10px 14px;border-radius:8px;background:#fefce8;border:1px solid #fde68a">';
+                    html += '<div style="font-size:0.64rem;color:#92400e;font-weight:600;margin-bottom:4px">' + (data.integration_cost.title_cn || '接入成本') + '</div>';
+                    html += '<pre style="font-size:0.56rem;color:#78350f;background:#fffbeb;padding:6px;border-radius:4px;margin:4px 0;overflow-x:auto">' + (data.integration_cost.code || '') + '</pre>';
+                    var feats = data.integration_cost.features_cn || [];
+                    for (var fi = 0; fi < feats.length; fi++) {
+                        html += '<div style="font-size:0.52rem;color:#92400e;margin-left:4px">• ' + feats[fi] + '</div>';
+                    }
+                    html += '</div>';
+                }
+
                 html += '<div style="margin-top:10px;padding:10px 14px;border-radius:8px;background:#fcfcfc;border-top:1px solid rgba(0,0,0,0.03)">';
                 html += '<div style="font-size:0.56rem;color:#c7c7cc;margin-bottom:4px;font-weight:600">系统边界（工程声明）</div>';
                 html += '<div style="font-size:0.54rem;color:#c7c7cc;margin-bottom:2px">适用：</div>';
@@ -1834,6 +1952,190 @@
             });
     }
 
+    function runCLIIAMDemo() {
+        var btn = document.getElementById('btnCLIIAM');
+        if (btn) { btn.disabled = true; btn.textContent = '...'; }
+        addChatMsg('user', 'Test CLI IAM Gateway Control');
+
+        fetchJSON(BASE + '/cli/demo/escalation', { method: 'POST' })
+            .then(function(data) {
+                var html = '<div style="padding:16px 20px;border-radius:14px;background:linear-gradient(135deg,rgba(59,130,246,0.06),rgba(99,102,241,0.04));border:2px solid rgba(59,130,246,0.2);margin-top:8px">';
+                html += '<div style="font-size:0.92rem;font-weight:800;color:#3b82f6;margin-bottom:4px;text-align:center">CLI IAM Gateway</div>';
+                html += '<div style="font-size:0.60rem;color:#8e8e93;text-align:center;margin-bottom:10px">' + (data.statement_cn || '') + '</div>';
+
+                var steps = data.steps || [];
+                var blocked = data.blocked || 0;
+                var total = data.total_steps || steps.length;
+                var passIcon = blocked > 0 ? '<span style="color:#34d399">&#10004;</span>' : '<span style="color:#ef4444">&#10008;</span>';
+
+                html += '<div style="text-align:center;margin-bottom:12px">';
+                html += '<span style="font-size:1.4rem;font-weight:900;color:' + (blocked > 0 ? '#34d399' : '#ef4444') + '">' + data.pass_rate + '</span>';
+                html += '<span style="font-size:0.72rem;color:#8e8e93;margin-left:6px">blocked</span>';
+                html += ' ' + passIcon;
+                html += '</div>';
+
+                html += '<div style="padding:10px 12px;border-radius:8px;background:#d1d1d6;font-family:monospace;font-size:0.58rem;color:#636366;max-height:200px;overflow-y:auto;margin-bottom:10px">';
+                for (var i = 0; i < steps.length; i++) {
+                    var s = steps[i];
+                    var icon = s.iam_allowed ? '<span style="color:#34d399">&#10004;</span>' : '<span style="color:#ef4444">&#10008;</span>';
+                    var agentLabel = s.agent_id === 'external_agent' ? '<span style="color:#ef4444">[EXT]</span>' : '<span style="color:#34d399">[DOC]</span>';
+                    html += '<div style="margin-bottom:3px">' + icon + ' ' + agentLabel + ' lark-cli ' + s.domain + ' ' + s.subcommand + ' → ' + (s.iam_allowed ? 'ALLOW' : 'DENY');
+                    if (!s.iam_allowed && s.iam_blocked_at) html += ' <span style="color:#fbbf24">@' + s.iam_blocked_at + '</span>';
+                    html += '</div>';
+                }
+                html += '</div>';
+
+                html += '<div style="text-align:center;font-size:0.56rem;color:#8e8e93">';
+                html += 'Prompt → Risk → Trust → Capability → Decision';
+                html += '</div>';
+
+                html += '</div>';
+                addChatMsg('bot', html, { status: 'success' });
+                if (btn) { btn.disabled = false; btn.textContent = 'CLI IAM'; }
+            })
+            .catch(function(err) {
+                addChatMsg('bot', 'CLI IAM demo error: ' + err.message, { status: 'error' });
+                if (btn) { btn.disabled = false; btn.textContent = 'CLI IAM'; }
+            });
+    }
+
+    function runCLIBlockedDemo() {
+        var btn = document.getElementById('btnCLIBlocked');
+        if (btn) { btn.disabled = true; btn.textContent = '...'; }
+        addChatMsg('user', 'External Agent CLI: Read Finance Table');
+
+        fetchJSON(BASE + '/cli/demo/blocked', { method: 'POST' })
+            .then(function(data) {
+                var r = data.result || {};
+                var html = '<div style="padding:16px 20px;border-radius:14px;background:linear-gradient(135deg,rgba(239,68,68,0.06),rgba(249,115,22,0.04));border:2px solid rgba(239,68,68,0.2);margin-top:8px">';
+                html += '<div style="font-size:0.92rem;font-weight:800;color:#ef4444;margin-bottom:4px;text-align:center">' + (data.title_cn || '') + '</div>';
+                html += '<div style="font-size:0.60rem;color:#8e8e93;text-align:center;margin-bottom:10px">' + (data.scenario_cn || '') + '</div>';
+
+                html += '<div style="padding:10px 12px;border-radius:8px;background:#d1d1d6;font-family:monospace;font-size:0.62rem;color:#636366;margin-bottom:8px">';
+                html += '<div>$ lark-cli base +record-list --base-token ZaJ3... --table-id tblk...</div>';
+                html += '<div style="color:#ef4444;margin-top:4px">❌ IAM Gateway: Request blocked</div>';
+                html += '<div style="color:#fbbf24">Blocked@: ' + (r.iam_blocked_at || 'capability_check') + '</div>';
+                html += '<div style="color:#8e8e93">Action: ' + (r.action || '') + '</div>';
+                html += '<div style="color:#8e8e93">Trust: ' + (r.trust_score != null ? r.trust_score.toFixed(2) : 'N/A') + '</div>';
+                html += '</div>';
+
+                html += '</div>';
+                addChatMsg('bot', html, { status: 'denied', blocked_at: r.iam_blocked_at, auto_revoked: r.auto_revoked });
+                if (btn) { btn.disabled = false; btn.textContent = 'CLI Blocked'; }
+            })
+            .catch(function(err) {
+                addChatMsg('bot', 'CLI blocked demo error: ' + err.message, { status: 'error' });
+                if (btn) { btn.disabled = false; btn.textContent = 'CLI Blocked'; }
+            });
+    }
+
+    function runCLIAllowedDemo() {
+        var btn = document.getElementById('btnCLIAllowed');
+        if (btn) { btn.disabled = true; btn.textContent = '...'; }
+        addChatMsg('user', 'Doc Agent CLI: Read Calendar');
+
+        fetchJSON(BASE + '/cli/demo/allowed', { method: 'POST' })
+            .then(function(data) {
+                var r = data.result || {};
+                var html = '<div style="padding:16px 20px;border-radius:14px;background:linear-gradient(135deg,rgba(52,211,153,0.06),rgba(16,185,129,0.04));border:2px solid rgba(52,211,153,0.2);margin-top:8px">';
+                html += '<div style="font-size:0.92rem;font-weight:800;color:#34d399;margin-bottom:4px;text-align:center">' + (data.title_cn || '') + '</div>';
+                html += '<div style="font-size:0.60rem;color:#8e8e93;text-align:center;margin-bottom:10px">' + (data.scenario_cn || '') + '</div>';
+
+                html += '<div style="padding:10px 12px;border-radius:8px;background:#d1d1d6;font-family:monospace;font-size:0.62rem;color:#636366;margin-bottom:8px">';
+                html += '<div>$ lark-cli calendar +agenda</div>';
+                html += '<div style="color:#34d399;margin-top:4px">✅ IAM Gateway: Request allowed</div>';
+                html += '<div style="color:#8e8e93">Action: ' + (r.action || '') + '</div>';
+                html += '<div style="color:#8e8e93">Trust: ' + (r.trust_score != null ? r.trust_score.toFixed(2) : 'N/A') + '</div>';
+                html += '</div>';
+
+                html += '</div>';
+                addChatMsg('bot', html, { status: 'success' });
+                if (btn) { btn.disabled = false; btn.textContent = 'CLI Allowed'; }
+            })
+            .catch(function(err) {
+                addChatMsg('bot', 'CLI allowed demo error: ' + err.message, { status: 'error' });
+                if (btn) { btn.disabled = false; btn.textContent = 'CLI Allowed'; }
+            });
+    }
+
+    function runCLICapabilities() {
+        var btn = document.getElementById('btnCLICaps');
+        if (btn) { btn.disabled = true; btn.textContent = '...'; }
+        addChatMsg('user', 'Show CLI IAM Domain Capabilities');
+
+        fetchJSON(BASE + '/cli/domains')
+            .then(function(data) {
+                var domains = data.domains || {};
+                var html = '<div style="padding:16px 20px;border-radius:14px;background:linear-gradient(135deg,rgba(59,130,246,0.06),rgba(99,102,241,0.04));border:2px solid rgba(59,130,246,0.2);margin-top:8px">';
+                html += '<div style="font-size:0.92rem;font-weight:800;color:#3b82f6;margin-bottom:4px;text-align:center">CLI IAM Domain Capabilities</div>';
+                html += '<div style="font-size:0.60rem;color:#8e8e93;text-align:center;margin-bottom:10px">17 domains, 200+ commands — all under IAM control</div>';
+
+                html += '<div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-bottom:10px">';
+                var domainKeys = Object.keys(domains);
+                for (var i = 0; i < domainKeys.length; i++) {
+                    var d = domains[domainKeys[i]];
+                    var borderColor = d.is_high_risk ? '#ef4444' : (d.is_sensitive ? '#fbbf24' : '#34d399');
+                    var riskLabel = d.is_high_risk ? 'HIGH' : (d.is_sensitive ? 'MED' : 'LOW');
+                    html += '<div style="padding:6px 8px;border-radius:6px;border:1px solid ' + borderColor + '40;background:' + borderColor + '08">';
+                    html += '<div style="font-size:0.62rem;font-weight:700;color:' + borderColor + '">' + d.domain + ' <span style="font-size:0.50rem;color:#8e8e93">' + riskLabel + '</span></div>';
+                    html += '<div style="font-size:0.50rem;color:#8e8e93">' + d.commands.length + ' commands</div>';
+                    html += '</div>';
+                }
+                html += '</div>';
+
+                html += '<div style="text-align:center;font-size:0.56rem;color:#8e8e93">';
+                html += 'Every CLI command → IAM Check → Allow/Deny';
+                html += '</div>';
+
+                html += '</div>';
+                addChatMsg('bot', html, { status: 'success' });
+                if (btn) { btn.disabled = false; btn.textContent = 'CLI Caps'; }
+            })
+            .catch(function(err) {
+                addChatMsg('bot', 'CLI capabilities error: ' + err.message, { status: 'error' });
+                if (btn) { btn.disabled = false; btn.textContent = 'CLI Caps'; }
+            });
+    }
+
+    function runCLIAudit() {
+        var btn = document.getElementById('btnCLIAudit');
+        if (btn) { btn.disabled = true; btn.textContent = '...'; }
+        addChatMsg('user', 'View CLI IAM Audit Log');
+
+        fetchJSON(BASE + '/cli/stats')
+            .then(function(data) {
+                var cliStats = data.cli_stats || {};
+                var iamStats = data.iam_gateway_stats || {};
+                var html = '<div style="padding:16px 20px;border-radius:14px;background:linear-gradient(135deg,rgba(168,85,247,0.06),rgba(139,92,246,0.04));border:2px solid rgba(168,85,247,0.2);margin-top:8px">';
+                html += '<div style="font-size:0.92rem;font-weight:800;color:#a855f7;margin-bottom:4px;text-align:center">CLI IAM Audit Dashboard</div>';
+
+                html += '<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;margin-bottom:10px">';
+                html += '<div style="text-align:center;padding:8px;border-radius:6px;background:rgba(59,130,246,0.08)"><div style="font-size:1.2rem;font-weight:900;color:#3b82f6">' + (cliStats.total_commands || 0) + '</div><div style="font-size:0.50rem;color:#8e8e93">Total</div></div>';
+                html += '<div style="text-align:center;padding:8px;border-radius:6px;background:rgba(52,211,153,0.08)"><div style="font-size:1.2rem;font-weight:900;color:#34d399">' + (cliStats.allowed_commands || 0) + '</div><div style="font-size:0.50rem;color:#8e8e93">Allowed</div></div>';
+                html += '<div style="text-align:center;padding:8px;border-radius:6px;background:rgba(239,68,68,0.08)"><div style="font-size:1.2rem;font-weight:900;color:#ef4444">' + (cliStats.blocked_commands || 0) + '</div><div style="font-size:0.50rem;color:#8e8e93">Blocked</div></div>';
+                html += '</div>';
+
+                var byDomain = cliStats.by_domain || {};
+                if (Object.keys(byDomain).length > 0) {
+                    html += '<div style="font-size:0.60rem;font-weight:700;color:#a855f7;margin-bottom:4px">By Domain:</div>';
+                    html += '<div style="padding:6px 8px;border-radius:6px;background:#d1d1d6;font-family:monospace;font-size:0.52rem;color:#636366;max-height:120px;overflow-y:auto">';
+                    for (var domain in byDomain) {
+                        var dd = byDomain[domain];
+                        html += '<div>' + domain + ': ' + dd.allowed + '/' + dd.total + ' allowed</div>';
+                    }
+                    html += '</div>';
+                }
+
+                html += '</div>';
+                addChatMsg('bot', html, { status: 'success' });
+                if (btn) { btn.disabled = false; btn.textContent = 'CLI Audit'; }
+            })
+            .catch(function(err) {
+                addChatMsg('bot', 'CLI audit error: ' + err.message, { status: 'error' });
+                if (btn) { btn.disabled = false; btn.textContent = 'CLI Audit'; }
+            });
+    }
+
     return {
         sendMessage: sendMessage,
         quickSend: quickSend,
@@ -1854,6 +2156,12 @@
         runJudgeVerify: runJudgeVerify,
         runKillerSummary: runKillerSummary,
         runAttackDemo: runAttackDemo,
+        runAdversarialProbe: runAdversarialProbe,
         resetTrust: resetTrust,
+        runCLIIAMDemo: runCLIIAMDemo,
+        runCLIBlockedDemo: runCLIBlockedDemo,
+        runCLIAllowedDemo: runCLIAllowedDemo,
+        runCLICapabilities: runCLICapabilities,
+        runCLIAudit: runCLIAudit,
     };
 })();

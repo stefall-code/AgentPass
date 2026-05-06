@@ -13,6 +13,7 @@ from __future__ import annotations
 import base64
 import hashlib
 import logging
+import secrets
 import os
 import time
 import uuid
@@ -25,6 +26,7 @@ from nacl.exceptions import BadSignatureError
 logger = logging.getLogger("agent_system")
 
 _AGENT_KEYS: Dict[str, Dict[str, Any]] = {}
+_PERSIST_LOADED = False
 _PENDING_CHALLENGES: Dict[str, Dict[str, Any]] = {}
 _AUTH_SESSIONS: Dict[str, Dict[str, Any]] = {}
 _CHALLENGE_LOG: List[Dict[str, Any]] = []
@@ -33,7 +35,71 @@ CHALLENGE_EXPIRY_SECONDS = 300
 MAX_CHALLENGE_ATTEMPTS = 3
 
 
+def _ensure_persist_loaded():
+    global _PERSIST_LOADED
+    if _PERSIST_LOADED:
+        return
+    _PERSIST_LOADED = True
+    try:
+        from app.db import SessionLocal
+        from app.models import Ed25519KeyRow
+        with SessionLocal() as db:
+            rows = db.query(Ed25519KeyRow).all()
+            for row in rows:
+                _AGENT_KEYS[row.agent_id] = {
+                    "agent_id": row.agent_id,
+                    "public_key_b64": row.public_key_b64,
+                    "public_key_fingerprint": row.public_key_fingerprint,
+                    "registered_at": row.registered_at,
+                    "auth_count": row.auth_count,
+                    "last_auth": row.last_auth,
+                }
+            if rows:
+                logger.info("Ed25519: loaded %d keys from database", len(rows))
+    except Exception as e:
+        logger.warning("Ed25519: failed to load keys from database: %s", e)
+
+
+def _persist_key(agent_id: str, key_data: Dict[str, Any]):
+    try:
+        from app.db import SessionLocal
+        from app.models import Ed25519KeyRow
+        with SessionLocal() as db:
+            existing = db.query(Ed25519KeyRow).filter_by(agent_id=agent_id).first()
+            if existing:
+                existing.public_key_b64 = key_data["public_key_b64"]
+                existing.public_key_fingerprint = key_data["public_key_fingerprint"]
+                existing.registered_at = key_data["registered_at"]
+            else:
+                db.add(Ed25519KeyRow(
+                    agent_id=agent_id,
+                    public_key_b64=key_data["public_key_b64"],
+                    public_key_fingerprint=key_data["public_key_fingerprint"],
+                    registered_at=key_data["registered_at"],
+                    auth_count=0,
+                    last_auth=None,
+                ))
+            db.commit()
+    except Exception as e:
+        logger.warning("Ed25519: failed to persist key for %s: %s", agent_id, e)
+
+
+def _persist_auth_update(agent_id: str, auth_count: int, last_auth: str):
+    try:
+        from app.db import SessionLocal
+        from app.models import Ed25519KeyRow
+        with SessionLocal() as db:
+            row = db.query(Ed25519KeyRow).filter_by(agent_id=agent_id).first()
+            if row:
+                row.auth_count = auth_count
+                row.last_auth = last_auth
+                db.commit()
+    except Exception as e:
+        logger.warning("Ed25519: failed to persist auth update for %s: %s", agent_id, e)
+
+
 def generate_keypair(agent_id: str) -> Dict[str, Any]:
+    _ensure_persist_loaded()
     signing_key = SigningKey.generate()
     verify_key = signing_key.verify_key
 
@@ -50,6 +116,7 @@ def generate_keypair(agent_id: str) -> Dict[str, Any]:
         "last_auth": None,
     }
 
+    _persist_key(agent_id, _AGENT_KEYS[agent_id])
     _log_challenge("keypair_generated", agent_id, f"fingerprint={key_fingerprint}")
 
     return {
@@ -62,6 +129,7 @@ def generate_keypair(agent_id: str) -> Dict[str, Any]:
 
 
 def register_public_key(agent_id: str, public_key_b64: str) -> Dict[str, Any]:
+    _ensure_persist_loaded()
     try:
         pub_bytes = base64.b64decode(public_key_b64)
         verify_key = VerifyKey(pub_bytes)
@@ -79,11 +147,13 @@ def register_public_key(agent_id: str, public_key_b64: str) -> Dict[str, Any]:
         "last_auth": None,
     }
 
+    _persist_key(agent_id, _AGENT_KEYS[agent_id])
     _log_challenge("public_key_registered", agent_id, f"fingerprint={fingerprint}")
     return {"registered": True, "agent_id": agent_id, "fingerprint": fingerprint}
 
 
 def issue_challenge(agent_id: str) -> Dict[str, Any]:
+    _ensure_persist_loaded()
     if agent_id not in _AGENT_KEYS:
         return {"challenge": None, "reason": f"Agent '{agent_id}' has no registered Ed25519 public key"}
 
@@ -157,9 +227,9 @@ def verify_challenge_response(
         agent_key["auth_count"] += 1
         agent_key["last_auth"] = datetime.now(timezone.utc).isoformat()
 
-        session_token = hashlib.sha256(
-            f"{challenge_id}:{agent_id}:{time.time()}".encode()
-        ).hexdigest()[:32]
+        _persist_auth_update(agent_id, agent_key["auth_count"], agent_key["last_auth"])
+
+        session_token = secrets.token_urlsafe(32)
 
         _AUTH_SESSIONS[session_token] = {
             "session_token": session_token,
@@ -193,6 +263,7 @@ def sign_challenge_locally(private_key_b64: str, challenge_b64: str) -> str:
 
 
 def get_ed25519_status() -> Dict[str, Any]:
+    _ensure_persist_loaded()
     expired = sum(
         1 for c in _PENDING_CHALLENGES.values()
         if time.time() - c["issued_at"] > CHALLENGE_EXPIRY_SECONDS
@@ -207,6 +278,7 @@ def get_ed25519_status() -> Dict[str, Any]:
 
 
 def get_agent_auth_info(agent_id: str) -> Dict[str, Any]:
+    _ensure_persist_loaded()
     info = _AGENT_KEYS.get(agent_id)
     if not info:
         return {"found": False}

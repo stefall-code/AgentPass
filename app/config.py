@@ -26,8 +26,19 @@ class Settings(BaseSettings):
     TOKEN_EXPIRE_MINUTES: int = 60
     DEFAULT_USAGE_LIMIT: int = 1000
 
+    _INSECURE_DEFAULTS = {
+        "JWT_SECRET": "dev-secret-change-me-at-least-32-bytes",
+    }
+
+    def validate_security(self) -> list[str]:
+        warnings = []
+        for key, default in self._INSECURE_DEFAULTS.items():
+            if getattr(self, key) == default:
+                warnings.append(key)
+        return warnings
+
     DENIAL_WINDOW_MINUTES: int = 10
-    DENIAL_LOCK_THRESHOLD: int = 3
+    DENIAL_LOCK_THRESHOLD: int = 10
 
     CORS_ORIGINS: list[str] = os.environ.get(
         "CORS_ORIGINS", "http://127.0.0.1:8000,http://localhost:8000"
@@ -45,6 +56,7 @@ class Settings(BaseSettings):
     FEISHU_APP_SECRET: str = ""
     FEISHU_VERIFICATION_TOKEN: str = ""
     FEISHU_ENCRYPT_KEY: str = ""
+    FEISHU_PUBLIC_URL: str = ""
 
     BITABLE_FINANCE_APP_TOKEN: str = ""
     BITABLE_FINANCE_TABLE_ID: str = ""
@@ -52,6 +64,26 @@ class Settings(BaseSettings):
     BITABLE_HR_TABLE_ID: str = ""
     BITABLE_SALES_APP_TOKEN: str = ""
     BITABLE_SALES_TABLE_ID: str = ""
+
+    OPENAI_API_KEY: str = ""
+    OPENAI_BASE_URL: str = "https://api.openai.com/v1"
+    OPENAI_MODEL: str = "gpt-4o-mini"
+
+    GEMINI_API_KEY: str = ""
+    GEMINI_BASE_URL: str = "https://generativelanguage.googleapis.com/v1beta/openai"
+    GEMINI_MODEL: str = "gemini-2.0-flash"
+
+    DEEPSEEK_API_KEY: str = ""
+    DEEPSEEK_BASE_URL: str = "https://api.deepseek.com/v1"
+    DEEPSEEK_MODEL: str = "deepseek-chat"
+
+    QWEN_API_KEY: str = ""
+    QWEN_BASE_URL: str = "https://dashscope.aliyuncs.com/compatible-mode/v1"
+    QWEN_MODEL: str = "qwen-plus"
+
+    DOUBAO_API_KEY: str = ""
+    DOUBAO_BASE_URL: str = "https://ark.cn-beijing.volces.com/api/v3"
+    DOUBAO_MODEL: str = "doubao-pro-32k-241215"
 
     BCRYPT_ROUNDS: int = 12
     HOST: str = os.environ.get("HOST", "127.0.0.1")
@@ -82,6 +114,27 @@ class Settings(BaseSettings):
     ]
 
     DEMO_AGENTS: list[dict] = [
+        {
+            "agent_id": "doc_agent",
+            "name": "Document Agent",
+            "role": "coordinator",
+            "api_key": "doc-agent-key",
+            "attributes": {"allowed_resources": ["read:doc", "write:doc:public", "delegate:data_agent", "delegate:external_agent"]},
+        },
+        {
+            "agent_id": "data_agent",
+            "name": "Data Agent",
+            "role": "data_reader",
+            "api_key": "data-agent-key",
+            "attributes": {"allowed_resources": ["read:feishu_table:finance", "read:feishu_table:hr", "write:feishu_table:finance"]},
+        },
+        {
+            "agent_id": "external_agent",
+            "name": "External Agent",
+            "role": "web_reader",
+            "api_key": "external-agent-key",
+            "attributes": {"allowed_resources": ["read:web"]},
+        },
         {
             "agent_id": "agent_admin_demo",
             "name": "Admin Demo Agent",

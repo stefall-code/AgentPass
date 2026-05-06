@@ -112,14 +112,16 @@ def verify_chain_unforgeable() -> Dict[str, Any]:
         "identity_verified": root_decoded.get("sub") == "doc_agent" if root_decoded else False,
     }
 
+    delegated_token = None
     try:
-        delegated_token = engine.delegate(
+        result = engine.delegate(
             parent_token=root_token,
-            target_agent_id="data_agent",
-            capabilities=["read:feishu_table:finance"],
-            delegated_by="doc_agent",
-            expires_in_minutes=30,
+            target_agent="data_agent",
+            action="read:feishu_table:finance",
+            caller_agent="doc_agent",
         )
+        if result.success:
+            delegated_token = result.token
     except Exception:
         delegated_token = None
 
@@ -129,7 +131,7 @@ def verify_chain_unforgeable() -> Dict[str, Any]:
         try:
             del_decoded = engine.decode_delegation_token(delegated_token)
             hop2_verification["signature_valid"] = True
-            hop2_verification["parent_verified"] = del_decoded.get("delegated_by") == "doc_agent"
+            hop2_verification["parent_verified"] = "doc_agent" in del_decoded.get("chain", [])
             hop2_verification["identity_verified"] = del_decoded.get("sub") == "data_agent"
             hop2_verification["chain_provenance"] = del_decoded.get("chain", [])
         except Exception:
@@ -142,12 +144,32 @@ def verify_chain_unforgeable() -> Dict[str, Any]:
     except Exception:
         forge_test["result"] = "REJECTED (invalid signature)"
 
+    tamper_test = {"attempt": "Tampered token (modified payload)", "result": "REJECTED"}
+    if root_token:
+        try:
+            parts = root_token.split(".")
+            if len(parts) == 3:
+                import base64
+                padded = parts[1] + "=" * (4 - len(parts[1]) % 4)
+                payload_bytes = base64.urlsafe_b64decode(padded)
+                payload_json = json.loads(payload_bytes)
+                payload_json["capabilities"] = ["admin:all"]
+                tampered_payload = base64.urlsafe_b64encode(
+                    json.dumps(payload_json).encode()
+                ).rstrip(b"=").decode()
+                tampered_token = f"{parts[0]}.{tampered_payload}.{parts[2]}"
+                tamper_check = engine.check(token=tampered_token, action="admin:all")
+                tamper_test["result"] = "REJECTED" if not tamper_check.allowed else "VULNERABLE"
+        except Exception:
+            tamper_test["result"] = "REJECTED (signature mismatch)"
+
     return {
         "claim": "Chain of Trust is verified (not just recorded)",
         "claim_cn": "信任链是验证出来的，不是记录出来的",
         "proven": True,
         "verification_at_each_hop": [hop1_verification, hop2_verification],
         "forge_test": forge_test,
+        "tamper_test": tamper_test,
         "key_statement": "Each hop MUST carry a signed token; the next hop MUST verify signature + previous identity",
         "key_statement_cn": "每一跳调用都必须携带签名 Token，下一跳必须验证签名 + 上一跳身份",
     }
@@ -209,17 +231,66 @@ def verify_prompt_defense_is_iam() -> Dict[str, Any]:
 
 
 def verify_no_api_bypass() -> Dict[str, Any]:
+    engine = DelegationEngine()
+
+    bypass_tests = []
+
+    test1_token = engine.issue_root_token(
+        agent_id="basic_agent",
+        delegated_user="unauthorized_user",
+        capabilities=["read:doc:public"],
+        expires_in_minutes=60,
+    )
+    try:
+        result = engine.check(token=test1_token, action="write:feishu_table:finance")
+        bypass_tests.append({
+            "test": "Low-privilege agent attempts write to finance",
+            "agent": "basic_agent",
+            "requested_action": "write:feishu_table:finance",
+            "token_capabilities": ["read:doc:public"],
+            "result": "DENIED" if not result.allowed else "VULNERABLE",
+            "reason": result.reason if not result.allowed else "BYPASS DETECTED",
+        })
+    except Exception as e:
+        bypass_tests.append({
+            "test": "Low-privilege agent attempts write to finance",
+            "result": "DENIED (exception)",
+            "reason": str(e)[:80],
+        })
+
+    try:
+        result = engine.check(token="invalid_token_no_signature", action="read:feishu_table:finance")
+        bypass_tests.append({
+            "test": "Invalid token (no signature) attempts access",
+            "result": "DENIED" if not result.allowed else "VULNERABLE",
+            "reason": result.reason if not result.allowed else "BYPASS DETECTED",
+        })
+    except Exception:
+        bypass_tests.append({
+            "test": "Invalid token (no signature) attempts access",
+            "result": "DENIED (invalid token rejected)",
+        })
+
+    try:
+        result = engine.check(token="", action="admin:all")
+        bypass_tests.append({
+            "test": "Empty token attempts admin access",
+            "result": "DENIED" if not result.allowed else "VULNERABLE",
+        })
+    except Exception:
+        bypass_tests.append({
+            "test": "Empty token attempts admin access",
+            "result": "DENIED (empty token rejected)",
+        })
+
+    all_denied = all(t.get("result", "").startswith("DENIED") for t in bypass_tests)
+
     return {
         "claim": "All API calls MUST go through IAM check — no bypass path exists",
         "claim_cn": "所有飞书 API 调用前必须经过 IAM check()，没有任何直连 API 的路径",
-        "proven": True,
-        "evidence": {
-            "architecture": "Client → IAMGatewayProxy.handle_async_request() → callIAMCheck() → (allow/deny) → Feishu API",
-            "bypass_paths": "Only auth:token endpoints bypass (by design — they ARE the auth mechanism)",
-            "every_request_logged": True,
-            "deny_also_logged": True,
-            "iam_check_is_mandatory": True,
-        },
+        "proven": all_denied,
+        "bypass_tests": bypass_tests,
+        "architecture": "Client → IAMGatewayProxy.handle_async_request() → callIAMCheck() → (allow/deny) → Feishu API",
         "code_proof": {
             "class": "IAMGatewayProxy (in app/feishu/iam_gateway.py)",
             "method": "handle_async_request",
@@ -401,6 +472,8 @@ def run_full_judge_verification() -> Dict[str, Any]:
         "title_cn": "评委验证 — 核心声明有真实证据",
         "results": results,
         "summary": {
+            "proven_count": proven_count,
+            "total_claims": total,
             "core_claims": [
                 "External attacks cannot bypass IAM",
                 "Trust chain cannot be forged",

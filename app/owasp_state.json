@@ -1,0 +1,15 @@
+{
+  "agent_budgets": {},
+  "global_budget": {
+    "total_budget": 100.0,
+    "total_spent": 0.0,
+    "alert_threshold": 0.8,
+    "hard_limit": 0.95,
+    "currency": "USD"
+  },
+  "circuit_breakers": {},
+  "agent_health": {},
+  "tool_registry": {},
+  "model_registry": {},
+  "saved_at": "2026-05-06T04:22:52.309284+00:00"
+}

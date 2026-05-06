@@ -15,12 +15,32 @@ MAX_CHAIN_DEPTH = 5
 
 CAPABILITY_AGENTS: Dict[str, Dict[str, Any]] = {
     "doc_agent": {
-        "capabilities": ["write:doc:public", "delegate:data_agent"],
-        "description": "Document Agent — can write public docs and delegate to data_agent",
+        "capabilities": [
+            "write:doc:public", "delegate:data_agent", "delegate:external_agent",
+            "read:calendar", "write:calendar",
+            "read:feishu_message", "write:feishu_message",
+            "read:doc", "write:doc",
+            "read:feishu_table", "read:feishu_table:finance", "read:feishu_table:hr",
+            "read:bitable", "write:bitable",
+            "read:sheet", "write:sheet",
+            "read:task", "write:task",
+            "read:contact", "read:mail",
+            "read:vc", "read:wiki", "read:drive",
+            "read:approval", "read:attendance",
+            "read:okr", "read:slides",
+            "read:whiteboard", "read:minutes",
+            "api:knowledge_base",
+        ],
+        "description": "Document Agent — can write public docs, delegate to data_agent and external_agent, and access most CLI domains",
     },
     "data_agent": {
-        "capabilities": ["read:feishu_table", "read:feishu_table:finance", "read:feishu_table:hr"],
-        "description": "Data Agent — can read Feishu tables (finance, HR, and general)",
+        "capabilities": [
+            "read:feishu_table", "read:feishu_table:finance", "read:feishu_table:hr",
+            "read:bitable", "read:sheet", "read:doc",
+            "read:calendar", "read:task", "read:contact",
+            "read:wiki", "read:drive", "read:vc",
+        ],
+        "description": "Data Agent — can read Feishu tables (finance, HR, and general) and other read-only CLI domains",
     },
     "external_agent": {
         "capabilities": ["read:web"],
@@ -37,24 +57,107 @@ REVOKED_AGENTS: Dict[str, str] = {}
 AGENT_TRUST_SCORE: Dict[str, float] = {
     "doc_agent": 0.9,
     "data_agent": 0.95,
-    "external_agent": 0.6,
+    "external_agent": 0.7,
 }
 
 TRUST_THRESHOLD = 0.5
 TRUST_REWARD = 0.01
 TRUST_PENALTY_DENY = 0.05
-TRUST_PENALTY_ESCALATION = 0.1
+TRUST_PENALTY_ESCALATION = 0.15
 AUTO_REVOKE_THRESHOLD = 0.3
+TRUST_COOLDOWN_SECONDS = 300
 
 AUTO_REVOKED_AGENTS: Dict[str, Dict[str, Any]] = {}
+
+_TRUST_PERSIST_LOADED = False
+
+
+def _ensure_trust_loaded():
+    global _TRUST_PERSIST_LOADED
+    if _TRUST_PERSIST_LOADED:
+        return
+    _TRUST_PERSIST_LOADED = True
+    CORE_AGENT_IDS = {"doc_agent", "data_agent", "external_agent"}
+    try:
+        from app.db import SessionLocal
+        from app.models import AgentReputationRow
+        with SessionLocal() as db:
+            rows = db.query(AgentReputationRow).filter(
+                AgentReputationRow.agent_id.in_(CORE_AGENT_IDS)
+            ).all()
+            for row in rows:
+                AGENT_TRUST_SCORE[row.agent_id] = row.score
+                if row.score <= AUTO_REVOKE_THRESHOLD:
+                    AUTO_REVOKED_AGENTS[row.agent_id] = {
+                        "reason": "Persisted auto-revoke",
+                        "trust_score_at_revoke": row.score,
+                        "revoked_at": row.last_computed_at,
+                    }
+    except Exception:
+        pass
+    _load_revocations_from_db()
+
+
+def _persist_trust_score(agent_id: str, score: float):
+    try:
+        from app.db import SessionLocal
+        from app.models import AgentReputationRow
+        with SessionLocal() as db:
+            row = db.query(AgentReputationRow).filter_by(agent_id=agent_id).first()
+            now = datetime.now(timezone.utc).isoformat()
+            if row:
+                row.score = score
+                row.last_computed_at = now
+            else:
+                db.add(AgentReputationRow(
+                    agent_id=agent_id,
+                    score=score,
+                    allow_rate=1.0 if score >= TRUST_THRESHOLD else 0.0,
+                    denial_streak=0,
+                    suspicious_pattern_count=0,
+                    consistency_bonus=0.0,
+                    trend="stable",
+                    last_computed_at=now,
+                    history_json="[]",
+                ))
+            db.commit()
+    except Exception:
+        pass
 
 
 def mark_token_used(jti: str) -> None:
     USED_TOKENS.add(jti)
+    try:
+        from app.db import SessionLocal
+        from app.models import TokenRevocationRow
+        with SessionLocal() as db:
+            exists = db.query(TokenRevocationRow).filter_by(revoke_type="used", revoke_key=jti).first()
+            if not exists:
+                db.add(TokenRevocationRow(
+                    revoke_type="used",
+                    revoke_key=jti,
+                    reason="Token consumed",
+                    created_at=datetime.now(timezone.utc).isoformat(),
+                ))
+                db.commit()
+    except Exception:
+        pass
 
 
 def is_token_used(jti: str) -> bool:
-    return jti in USED_TOKENS
+    if jti in USED_TOKENS:
+        return True
+    try:
+        from app.db import SessionLocal
+        from app.models import TokenRevocationRow
+        with SessionLocal() as db:
+            row = db.query(TokenRevocationRow).filter_by(revoke_type="used", revoke_key=jti).first()
+            if row:
+                USED_TOKENS.add(jti)
+                return True
+    except Exception:
+        pass
+    return False
 
 
 def clear_used_tokens() -> int:
@@ -65,16 +168,56 @@ def clear_used_tokens() -> int:
 
 def revoke_token_by_jti(jti: str) -> None:
     REVOKED_TOKENS.add(jti)
+    _persist_revocation("jti", jti, f"Token revoked (jti={jti[:8]}...)")
 
 
 def revoke_tokens_by_user(user: str, reason: str = "") -> int:
     REVOKED_USERS[user] = reason or f"Revoked by admin for user={user}"
+    _persist_revocation("user", user, REVOKED_USERS[user])
     return 1
 
 
 def revoke_tokens_by_agent(agent_id: str, reason: str = "") -> int:
     REVOKED_AGENTS[agent_id] = reason or f"Revoked by admin for agent={agent_id}"
+    _persist_revocation("agent", agent_id, REVOKED_AGENTS[agent_id])
     return 1
+
+
+def _persist_revocation(revoke_type: str, revoke_key: str, reason: str) -> None:
+    try:
+        from app.db import SessionLocal
+        from app.models import TokenRevocationRow
+        with SessionLocal() as db:
+            exists = db.query(TokenRevocationRow).filter_by(revoke_type=revoke_type, revoke_key=revoke_key).first()
+            if not exists:
+                db.add(TokenRevocationRow(
+                    revoke_type=revoke_type,
+                    revoke_key=revoke_key,
+                    reason=reason,
+                    created_at=datetime.now(timezone.utc).isoformat(),
+                ))
+                db.commit()
+    except Exception:
+        pass
+
+
+def _load_revocations_from_db() -> None:
+    try:
+        from app.db import SessionLocal
+        from app.models import TokenRevocationRow
+        with SessionLocal() as db:
+            rows = db.query(TokenRevocationRow).all()
+            for row in rows:
+                if row.revoke_type == "used":
+                    USED_TOKENS.add(row.revoke_key)
+                elif row.revoke_type == "jti":
+                    REVOKED_TOKENS.add(row.revoke_key)
+                elif row.revoke_type == "user":
+                    REVOKED_USERS[row.revoke_key] = row.reason or ""
+                elif row.revoke_type == "agent":
+                    REVOKED_AGENTS[row.revoke_key] = row.reason or ""
+    except Exception:
+        pass
 
 
 def is_token_revoked(claims: Dict[str, Any]) -> tuple[bool, str]:
@@ -89,6 +232,29 @@ def is_token_revoked(claims: Dict[str, Any]) -> tuple[bool, str]:
     agent_id = claims.get("agent_id", "")
     if agent_id and agent_id in REVOKED_AGENTS:
         return True, f"Token revoked: agent '{agent_id}' is revoked ({REVOKED_AGENTS[agent_id]})"
+
+    if jti or delegated_user or agent_id:
+        try:
+            from app.db import SessionLocal
+            from app.models import TokenRevocationRow
+            with SessionLocal() as db:
+                if jti:
+                    row = db.query(TokenRevocationRow).filter_by(revoke_type="jti", revoke_key=jti).first()
+                    if row:
+                        REVOKED_TOKENS.add(jti)
+                        return True, f"Token revoked (jti={jti[:8]}...)"
+                if delegated_user:
+                    row = db.query(TokenRevocationRow).filter_by(revoke_type="user", revoke_key=delegated_user).first()
+                    if row:
+                        REVOKED_USERS[delegated_user] = row.reason or ""
+                        return True, f"Token revoked: user '{delegated_user}' is revoked ({row.reason})"
+                if agent_id:
+                    row = db.query(TokenRevocationRow).filter_by(revoke_type="agent", revoke_key=agent_id).first()
+                    if row:
+                        REVOKED_AGENTS[agent_id] = row.reason or ""
+                        return True, f"Token revoked: agent '{agent_id}' is revoked ({row.reason})"
+        except Exception:
+            pass
 
     return False, ""
 
@@ -111,48 +277,113 @@ def get_revoked_list() -> Dict[str, Any]:
 
 
 def get_trust_score(agent_id: str) -> float:
+    _ensure_trust_loaded()
     return AGENT_TRUST_SCORE.get(agent_id, 0.5)
 
 
 def update_trust_score(agent_id: str, delta: float) -> tuple[float, float]:
+    _ensure_trust_loaded()
     before = AGENT_TRUST_SCORE.get(agent_id, 0.5)
     after = max(0.0, min(1.0, before + delta))
     AGENT_TRUST_SCORE[agent_id] = after
+    _persist_trust_score(agent_id, after)
     return before, after
 
 
 def get_all_trust_scores() -> Dict[str, Any]:
+    CORE_AGENT_IDS = {"doc_agent", "data_agent", "external_agent"}
     scores = {}
-    for agent_id in CAPABILITY_AGENTS:
+    for agent_id in CORE_AGENT_IDS:
         scores[agent_id] = {
             "trust_score": AGENT_TRUST_SCORE.get(agent_id, 0.5),
             "status": "trusted" if AGENT_TRUST_SCORE.get(agent_id, 0.5) >= TRUST_THRESHOLD else "untrusted",
-            "capabilities": CAPABILITY_AGENTS[agent_id]["capabilities"],
+            "capabilities": CAPABILITY_AGENTS.get(agent_id, {}).get("capabilities", []),
         }
-    for agent_id, score in AGENT_TRUST_SCORE.items():
-        if agent_id not in scores:
-            scores[agent_id] = {
-                "trust_score": score,
-                "status": "trusted" if score >= TRUST_THRESHOLD else "untrusted",
-                "capabilities": [],
-            }
     return {"agents": scores, "threshold": TRUST_THRESHOLD}
 
 
 def reset_trust_scores() -> Dict[str, float]:
-    defaults = {"doc_agent": 0.9, "data_agent": 0.95, "external_agent": 0.6}
+    _ensure_trust_loaded()
+    defaults = {"doc_agent": 0.9, "data_agent": 0.95, "external_agent": 0.7}
     for agent_id, score in defaults.items():
         AGENT_TRUST_SCORE[agent_id] = score
+        _persist_trust_score(agent_id, score)
     for agent_id in list(AGENT_TRUST_SCORE.keys()):
         if agent_id not in defaults:
-            AGENT_TRUST_SCORE[agent_id] = 0.5
-    return dict(AGENT_TRUST_SCORE)
+            del AGENT_TRUST_SCORE[agent_id]
+    AUTO_REVOKED_AGENTS.clear()
+    REVOKED_TOKENS.clear()
+    REVOKED_USERS.clear()
+    REVOKED_AGENTS.clear()
+    USED_TOKENS.clear()
+    try:
+        from app.db import SessionLocal
+        from app.models import TokenRevocationRow, AgentReputationRow
+        with SessionLocal() as db:
+            db.query(TokenRevocationRow).delete()
+            db.query(AgentReputationRow).filter(
+                ~AgentReputationRow.agent_id.in_(defaults.keys())
+            ).delete(synchronize_session=False)
+            for agent_id, score in defaults.items():
+                row = db.query(AgentReputationRow).filter_by(agent_id=agent_id).first()
+                if row:
+                    row.score = score
+                    row.allow_rate = 1.0
+                    row.denial_streak = 0
+                    row.suspicious_pattern_count = 0
+            from app.models import AgentRow
+            for row in db.query(AgentRow).all():
+                if row.status == "suspended":
+                    row.status = "active"
+                    row.status_reason = None
+            db.commit()
+    except Exception:
+        pass
+    return {k: v for k, v in AGENT_TRUST_SCORE.items() if k in defaults}
+
+
+def try_cooldown_recover(agent_id: str) -> Dict[str, Any]:
+    _ensure_trust_loaded()
+    if agent_id not in AUTO_REVOKED_AGENTS:
+        return {"agent_id": agent_id, "recovered": False, "reason": "not auto-revoked"}
+
+    revoke_info = AUTO_REVOKED_AGENTS[agent_id]
+    revoked_at_str = revoke_info.get("revoked_at", "")
+    try:
+        revoked_at = datetime.fromisoformat(revoked_at_str)
+        elapsed = (datetime.now(timezone.utc) - revoked_at).total_seconds()
+    except Exception:
+        elapsed = TRUST_COOLDOWN_SECONDS + 1
+
+    if elapsed < TRUST_COOLDOWN_SECONDS:
+        remaining = TRUST_COOLDOWN_SECONDS - elapsed
+        return {
+            "agent_id": agent_id,
+            "recovered": False,
+            "reason": f"cooldown not expired, {remaining:.0f}s remaining",
+            "cooldown_remaining": remaining,
+        }
+
+    recovered_score = TRUST_THRESHOLD
+    AGENT_TRUST_SCORE[agent_id] = recovered_score
+    _persist_trust_score(agent_id, recovered_score)
+    del AUTO_REVOKED_AGENTS[agent_id]
+    REVOKED_AGENTS.pop(agent_id, None)
+
+    return {
+        "agent_id": agent_id,
+        "recovered": True,
+        "trust_score": recovered_score,
+        "reason": f"cooldown expired after {elapsed:.0f}s, recovered to threshold",
+    }
 
 
 def auto_revoke_agent(agent_id: str, reason: str = "") -> Dict[str, Any]:
+    _ensure_trust_loaded()
     revoke_tokens_by_agent(agent_id, reason or f"Auto revoke: trust score below {AUTO_REVOKE_THRESHOLD}")
     trust_before = AGENT_TRUST_SCORE.get(agent_id, 0.5)
     AGENT_TRUST_SCORE[agent_id] = 0.0
+    _persist_trust_score(agent_id, 0.0)
     AUTO_REVOKED_AGENTS[agent_id] = {
         "reason": reason or f"Auto revoke: trust score {trust_before:.2f} < threshold {AUTO_REVOKE_THRESHOLD}",
         "trust_score_at_revoke": trust_before,
@@ -176,6 +407,18 @@ def is_agent_auto_revoked(agent_id: str) -> tuple[bool, str]:
 def clear_auto_revoked() -> int:
     count = len(AUTO_REVOKED_AGENTS)
     AUTO_REVOKED_AGENTS.clear()
+    REVOKED_AGENTS.clear()
+    REVOKED_USERS.clear()
+    REVOKED_TOKENS.clear()
+    USED_TOKENS.clear()
+    try:
+        from app.db import SessionLocal
+        from app.models import TokenRevocationRow
+        with SessionLocal() as db:
+            db.query(TokenRevocationRow).delete()
+            db.commit()
+    except Exception:
+        pass
     return count
 
 
@@ -423,7 +666,16 @@ class DelegationEngine:
         if action_overlap:
             effective_caps = action_overlap
         else:
-            effective_caps = target_action_caps
+            parent_wildcard = any(c == "*" or c.endswith(":*") for c in parent_action_caps)
+            if parent_wildcard:
+                effective_caps = target_action_caps
+            elif has_delegate_cap:
+                effective_caps = target_action_caps
+            else:
+                return DelegationResult(
+                    success=False,
+                    reason=f"Delegation denied: no capability overlap between parent {parent_action_caps} and target {target_action_caps}. Principle of least privilege violated.",
+                )
 
         effective_caps = effective_caps | target_delegate_caps
 

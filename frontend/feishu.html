@@ -1,9 +1,9 @@
-﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿﻿<!DOCTYPE html>
+﻿﻿﻿﻿﻿﻿﻿﻿<!DOCTYPE html>
 <html lang="zh-CN" data-theme="light">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>飞书安全交互 - AgentPass v2.5</title>
+    <title>飞书安全交互 - AgentPass v2.6</title>
     <link rel="stylesheet" href="/static/styles.css?v=3.2">
     <style>
         html[data-theme="light"] {
@@ -259,8 +259,8 @@
                     <div class="fs-top-stat"><div class="val" style="font-size:0.9rem" id="statMode">—</div><div class="lbl">Mode</div></div>
                 </div>
                 <div style="display:flex;gap:8px;align-items:center">
-                    <span style="font-size:0.6rem;color:#8e8e93">AgentPass v2.5</span>
-                    <button class="fs-btn fs-btn-ghost" onclick="FS.connectFeishu()" id="btnConnect" style="padding:6px 12px;font-size:0.7rem">🚀 连接</button>
+                    <span style="font-size:0.6rem;color:#8e8e93">AgentPass v2.6</span>
+                    <button class="fs-btn fs-btn-ghost" onclick="FS.connectFeishu()" id="btnConnect" style="padding:6px 12px;font-size:0.7rem">🔌 连接WS</button>
                     <button class="fs-btn fs-btn-ghost" onclick="FS.resetTrust()" id="btnReset" style="padding:6px 12px;font-size:0.7rem">🔄 重置</button>
                 </div>
             </div>
@@ -268,6 +268,8 @@
                 <div class="fs-actions-primary">
                     <button class="fs-btn" onclick="FS.runKillerSummary()" id="btnSummary" style="background:linear-gradient(135deg,#ef4444,#f97316);color:#fff;font-weight:800;font-size:0.85rem;padding:9px 18px;box-shadow:0 0 16px rgba(239,68,68,0.25)">🔥 为什么需要 AgentPass</button>
                     <button class="fs-btn" onclick="FS.runAttackDemo()" id="btnAttack" style="background:linear-gradient(135deg,#ef4444,#dc2626);color:#fff;font-weight:800;font-size:0.85rem;padding:9px 18px;box-shadow:0 0 16px rgba(239,68,68,0.3);animation:fsAttackPulse 2s ease infinite">⚔️ 运行真实攻击测试</button>
+                    <button class="fs-btn" onclick="FS.runAdversarialProbe()" id="btnAdversarial" style="background:linear-gradient(135deg,#f97316,#ea580c);color:#fff;font-weight:700;font-size:0.82rem;padding:9px 16px">🔥 对抗Agent探测</button>
+                    <button class="fs-btn" onclick="FS.runCLIIAMDemo()" id="btnCLIIAM" style="background:linear-gradient(135deg,#3b82f6,#6366f1);color:#fff;font-weight:700;font-size:0.82rem;padding:9px 16px">🖥️ CLI IAM管控</button>
                     <button class="fs-btn" onclick="FS.runJudgeVerify()" id="btnJudge" style="background:linear-gradient(135deg,#06b6d4,#3b82f6);color:#fff;font-weight:700;font-size:0.82rem;padding:9px 16px">🔍 可验证性证明</button>
                 </div>
                 <div class="fs-actions-divider"></div>
@@ -281,6 +283,10 @@
                     <button class="fs-btn fs-btn-ghost" onclick="FS.runProtocolsDemo()" id="btnProtocols">🌐 MCP</button>
                     <button class="fs-btn fs-btn-ghost" onclick="FS.runBrokerDemo()" id="btnBroker">🔑 凭证</button>
                     <button class="fs-btn fs-btn-ghost" onclick="FS.runAlignmentDemo()" id="btnAlignment">🛡️ 对齐</button>
+                    <button class="fs-btn fs-btn-ghost" onclick="FS.runCLIBlockedDemo()" id="btnCLIBlocked">🚫 CLI拦截</button>
+                    <button class="fs-btn fs-btn-ghost" onclick="FS.runCLIAllowedDemo()" id="btnCLIAllowed">✅ CLI放行</button>
+                    <button class="fs-btn fs-btn-ghost" onclick="FS.runCLICapabilities()" id="btnCLICaps">📋 CLI域</button>
+                    <button class="fs-btn fs-btn-ghost" onclick="FS.runCLIAudit()" id="btnCLIAudit">📊 CLI审计</button>
                 </div>
                 <button class="fs-actions-toggle" id="btnMoreActions" onclick="document.getElementById('secondaryActions').classList.toggle('open')">更多 ▾</button>
             </div>
@@ -379,13 +385,13 @@
             <div style="padding:18px 24px;border-radius:14px;background:#ffffff;border:1px solid rgba(0,0,0,0.06);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:14px;box-shadow:0 1px 3px rgba(0,0,0,0.04)">
                 <div style="font-size:0.88rem;color:#636366;line-height:1.8">
                     <span style="font-weight:700;color:#1d1d1f;font-size:0.92rem">部署说明</span>
-                    <span style="margin-left:12px">默认 Mock 模式，所有演示可直接使用</span>
+                    <span style="margin-left:12px">飞书已配置，WebSocket长连接自动建立</span>
                     <span style="margin-left:12px;color:rgba(0,0,0,0.15)">|</span>
                     <span style="margin-left:12px">连接飞书：配置 <code style="color:#0071e3;font-family:monospace;font-size:0.82rem;font-weight:600">.env</code> 中 <code style="color:#0071e3;font-family:monospace;font-size:0.82rem;font-weight:600">FEISHU_APP_ID</code> + <code style="color:#0071e3;font-family:monospace;font-size:0.82rem;font-weight:600">FEISHU_APP_SECRET</code></span>
                     <span style="margin-left:12px;color:rgba(0,0,0,0.15)">|</span>
-                    <span style="margin-left:12px">公网穿透：安装 <a href="https://ngrok.com/download" target="_blank" style="color:#0071e3;text-decoration:none;font-weight:600">ngrok</a> 并运行 <code style="color:#0071e3;font-family:monospace;font-size:0.82rem;font-weight:600">ngrok config add-authtoken YOUR_TOKEN</code></span>
+                    <span style="margin-left:12px">连接模式：<span style="color:#6366f1;font-weight:600">WebSocket 长连接</span>（无需公网暴露，无需 ngrok）</span>
                 </div>
-                <div style="font-size:0.78rem;color:#8e8e93;font-weight:600">AgentPass v2.5</div>
+                <div style="font-size:0.78rem;color:#8e8e93;font-weight:600">AgentPass v2.6</div>
             </div>
         </div>
     </div>

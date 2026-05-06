@@ -17,7 +17,6 @@ logger = logging.getLogger("agent_system")
 _cleanup_task: asyncio.Task | None = None
 _daily_stat_task: asyncio.Task | None = None
 _audit_prune_task: asyncio.Task | None = None
-_ngrok_ws_task: asyncio.Task | None = None
 _approval_timeout_task: asyncio.Task | None = None
 _reputation_task: asyncio.Task | None = None
 
@@ -56,22 +55,6 @@ async def _audit_prune_loop():
             break
         except Exception:
             logger.exception("audit prune error")
-
-
-async def _ngrok_ws_broadcast_loop():
-    while True:
-        try:
-            await asyncio.sleep(30)
-            ngrok_url = _get_ngrok_url()
-            if ngrok_url:
-                await ws_manager.broadcast_json({
-                    "type": "ngrok_url",
-                    "url": ngrok_url,
-                })
-        except asyncio.CancelledError:
-            break
-        except Exception:
-            logger.exception("ngrok ws broadcast error")
 
 
 async def _approval_timeout_loop():
@@ -192,28 +175,16 @@ def _prune_old_audit_logs():
 
 
 def _get_ngrok_url() -> str | None:
-    try:
-        from pyngrok import ngrok
-        tunnels = ngrok.get_tunnels()
-        for t in tunnels:
-            if t.public_url and t.public_url.startswith("https://"):
-                return t.public_url
-    except Exception:
-        pass
     return None
 
 
 def start_background_tasks() -> list[asyncio.Task]:
-    global _cleanup_task, _daily_stat_task, _audit_prune_task, _ngrok_ws_task, _approval_timeout_task, _reputation_task
+    global _cleanup_task, _daily_stat_task, _audit_prune_task, _approval_timeout_task, _reputation_task
     _cleanup_task = asyncio.create_task(_token_cleanup_loop())
     _daily_stat_task = asyncio.create_task(_daily_stat_loop())
     _audit_prune_task = asyncio.create_task(_audit_prune_loop())
     _approval_timeout_task = asyncio.create_task(_approval_timeout_loop())
     _reputation_task = asyncio.create_task(_reputation_loop())
-
-    import os
-    if os.environ.get("NGROK_AUTHTOKEN"):
-        _ngrok_ws_task = asyncio.create_task(_ngrok_ws_broadcast_loop())
 
     ws_manager.start_consumer()
 
@@ -226,8 +197,8 @@ def start_background_tasks() -> list[asyncio.Task]:
 
 
 async def stop_background_tasks():
-    global _cleanup_task, _daily_stat_task, _audit_prune_task, _ngrok_ws_task, _approval_timeout_task, _reputation_task
-    for task in [_cleanup_task, _daily_stat_task, _audit_prune_task, _ngrok_ws_task, _approval_timeout_task, _reputation_task]:
+    global _cleanup_task, _daily_stat_task, _audit_prune_task, _approval_timeout_task, _reputation_task
+    for task in [_cleanup_task, _daily_stat_task, _audit_prune_task, _approval_timeout_task, _reputation_task]:
         if task and not task.done():
             task.cancel()
     await ws_manager.stop_consumer()

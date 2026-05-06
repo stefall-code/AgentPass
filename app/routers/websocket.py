@@ -90,10 +90,11 @@ async def websocket_audit(websocket: WebSocket):
     try:
         await websocket.accept()
         await ws_manager.add(websocket, agent_id)
+        ws_manager.start_consumer()
         _update_heartbeat()
         while True:
             try:
-                await asyncio.wait_for(websocket.receive_text(), timeout=15.0)
+                data = await asyncio.wait_for(websocket.receive_text(), timeout=15.0)
                 ws_manager.touch()
                 _update_heartbeat()
             except WebSocketDisconnect:

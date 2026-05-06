@@ -44,7 +44,6 @@ def _compute_chain_hash(log_id: int, agent_id: str | None, action: str,
                         resource: str, decision: str, reason: str,
                         created_at: str, prev_hash: str) -> str:
     payload = json.dumps({
-        "id": log_id,
         "agent_id": agent_id,
         "action": action,
         "resource": resource,
@@ -73,38 +72,7 @@ def log_event(
 
     if six_layer:
         context["_six_layer"] = six_layer
-    else:
-        try:
-            from app.security.six_layer_verify import verify_six_layers
-            trust_score = context.get("trust_score", 0.5)
-            risk_score = context.get("risk_score", 0.0)
-            role = context.get("role", "basic")
-            chain = context.get("delegation_chain", [agent_id] if agent_id else [])
-            v = verify_six_layers(
-                agent_id=agent_id or "unknown",
-                action=f"{action}:{resource}" if resource else action,
-                input_text=context.get("input_text", ""),
-                trust_score=trust_score,
-                risk_score=risk_score,
-                role=role,
-                delegation_chain=chain,
-                allowed=(decision == "allow"),
-                blocked_at="" if decision == "allow" else "iam_gateway",
-                auto_revoked=context.get("auto_revoked", False),
-                reason=reason,
-            )
-            context["_six_layer"] = {
-                "overall": v.overall_status,
-                "decision": v.final_decision,
-                "layers": {
-                    l.layer_id: {"name": l.layer_name, "status": l.status, "detail": l.detail}
-                    for l in v.layers
-                },
-            }
-        except Exception:
-            pass
 
-    # Write to SDK Audit (in-memory, for future export)
     try:
         _sdk_audit.log_event(
             event_type=action,
@@ -118,31 +86,6 @@ def log_event(
         )
     except Exception as sdk_err:
         logger.warning(f"SDK Audit logging failed: {sdk_err}")
-
-    prev_hash = _get_last_chain_hash()
-
-    with SessionLocal() as db:
-        row = AuditLogRow(
-            agent_id=agent_id,
-            action=action,
-            resource=resource,
-            decision=decision,
-            reason=reason,
-            ip_address=ip_address,
-            token_id=token_id,
-            created_at=now,
-            context_json=json.dumps(context, ensure_ascii=False),
-        )
-        db.add(row)
-        db.flush()
-
-        chain_hash = _compute_chain_hash(
-            row.id, agent_id, action, resource, decision, reason, now, prev_hash
-        )
-        context["_chain_hash"] = chain_hash
-        row.context_json = json.dumps(context, ensure_ascii=False)
-        db.commit()
-        _CHAIN_HASH_CACHE = chain_hash
 
     try:
         from app.ws import ws_manager
@@ -160,8 +103,59 @@ def log_event(
     except ImportError:
         pass
 
+    try:
+        import asyncio
+        loop = asyncio.get_running_loop()
+        loop.run_in_executor(None, _write_audit_db, action, resource, decision, reason, agent_id, ip_address, token_id, now, context)
+    except RuntimeError:
+        _write_audit_db(action, resource, decision, reason, agent_id, ip_address, token_id, now, context)
+
     if decision == "deny" and agent_id:
         _maybe_lock_agent(agent_id)
+
+
+import threading
+
+_WRITE_LOCK = threading.Lock()
+
+
+def _write_audit_db(action, resource, decision, reason, agent_id, ip_address, token_id, now, context):
+    global _CHAIN_HASH_CACHE
+    with _WRITE_LOCK:
+        try:
+            with SessionLocal() as db:
+                prev_row = db.execute(
+                    select(AuditLogRow).order_by(desc(AuditLogRow.id)).limit(1)
+                ).scalar_one_or_none()
+                prev_hash = "genesis"
+                if prev_row:
+                    try:
+                        prev_ctx = json.loads(prev_row.context_json or "{}")
+                        prev_hash = prev_ctx.get("_chain_hash", "genesis")
+                    except (json.JSONDecodeError, TypeError):
+                        prev_hash = "genesis"
+
+                chain_hash = _compute_chain_hash(
+                    0, agent_id, action, resource, decision, reason, now, prev_hash
+                )
+                context["_chain_hash"] = chain_hash
+
+                row = AuditLogRow(
+                    agent_id=agent_id,
+                    action=action,
+                    resource=resource,
+                    decision=decision,
+                    reason=reason,
+                    ip_address=ip_address,
+                    token_id=token_id,
+                    created_at=now,
+                    context_json=json.dumps(context, ensure_ascii=False),
+                )
+                db.add(row)
+                db.commit()
+                _CHAIN_HASH_CACHE = chain_hash
+        except Exception as e:
+            logger.error("Failed to write audit log: %s", e)
 
 
 def _maybe_lock_agent(agent_id: str) -> None:
@@ -284,7 +278,6 @@ def get_sdk_audit_all_events() -> list[dict]:
 
 
 def verify_chain_integrity() -> dict:
-    """验证审计日志哈希链完整性"""
     with SessionLocal() as db:
         rows = db.execute(
             select(AuditLogRow).order_by(AuditLogRow.id.asc())
@@ -293,9 +286,24 @@ def verify_chain_integrity() -> dict:
     if not rows:
         return {"valid": True, "total_logs": 0, "verified": 0, "broken_at": None, "message": "No audit logs to verify"}
 
+    first_hashed = None
+    for row in rows:
+        try:
+            ctx = json.loads(row.context_json or "{}")
+            if ctx.get("_chain_hash"):
+                first_hashed = row
+                break
+        except (json.JSONDecodeError, TypeError):
+            pass
+
+    if first_hashed is None:
+        return {"valid": True, "total_logs": len(rows), "verified": 0, "broken_at": None, "message": f"{len(rows)} legacy logs (pre-hash), chain verification starts from next log"}
+
     prev_hash = "genesis"
     broken_at = None
     verified = 0
+    legacy_count = 0
+    started = False
 
     for row in rows:
         try:
@@ -304,8 +312,13 @@ def verify_chain_integrity() -> dict:
         except (json.JSONDecodeError, TypeError):
             stored_hash = ""
 
+        if not stored_hash and not started:
+            legacy_count += 1
+            continue
+
+        started = True
         expected_hash = _compute_chain_hash(
-            row.id, row.agent_id, row.action, row.resource,
+            0, row.agent_id, row.action, row.resource,
             row.decision, row.reason, row.created_at, prev_hash
         )
 
@@ -319,10 +332,40 @@ def verify_chain_integrity() -> dict:
     return {
         "valid": broken_at is None,
         "total_logs": len(rows),
+        "legacy_logs": legacy_count,
         "verified": verified,
         "broken_at": broken_at,
         "message": "Hash chain integrity verified" if broken_at is None else f"Chain broken at log id={broken_at}",
     }
+
+
+def rebuild_chain() -> dict:
+    with SessionLocal() as db:
+        rows = db.execute(
+            select(AuditLogRow).order_by(AuditLogRow.id.asc())
+        ).scalars().all()
+
+        if not rows:
+            return {"rebuilt": 0, "message": "No audit logs to rebuild"}
+
+        prev_hash = "genesis"
+        rebuilt = 0
+        for row in rows:
+            ctx = json.loads(row.context_json or "{}")
+            chain_hash = _compute_chain_hash(
+                0, row.agent_id, row.action, row.resource,
+                row.decision, row.reason, row.created_at, prev_hash
+            )
+            ctx["_chain_hash"] = chain_hash
+            row.context_json = json.dumps(ctx, ensure_ascii=False)
+            prev_hash = chain_hash
+            rebuilt += 1
+        db.commit()
+
+    global _CHAIN_HASH_CACHE
+    _CHAIN_HASH_CACHE = prev_hash
+
+    return {"rebuilt": rebuilt, "message": f"Hash chain rebuilt for {rebuilt} logs"}
 
 
 def get_sdk_audit_count() -> int:

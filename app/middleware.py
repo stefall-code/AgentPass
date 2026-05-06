@@ -13,11 +13,16 @@ import logging
 logger = logging.getLogger("agent_system")
 
 
+import re
+
+_REQUEST_ID_PATTERN = re.compile(r'^[a-zA-Z0-9\-_]{1,64}$')
+
+
 class RequestIDMiddleware(BaseHTTPMiddleware):
-    """为每个请求分配唯一追踪ID"""
 
     async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
-        request_id = request.headers.get("X-Request-ID") or str(uuid.uuid4())
+        raw_id = request.headers.get("X-Request-ID", "")
+        request_id = raw_id if _REQUEST_ID_PATTERN.match(raw_id) else str(uuid.uuid4())
         request.state.request_id = request_id
         response = await call_next(request)
         response.headers["X-Request-ID"] = request_id

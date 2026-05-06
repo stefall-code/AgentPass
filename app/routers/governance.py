@@ -145,8 +145,11 @@ def _fetch_governance_events(
 
 
 def _get_top_risky_agents(limit: int = 5) -> List[Dict[str, Any]]:
+    CORE_AGENT_IDS = {"doc_agent", "data_agent", "external_agent"}
     agents = []
     for agent_id, score in AGENT_TRUST_SCORE.items():
+        if agent_id not in CORE_AGENT_IDS:
+            continue
         revoked, reason = is_agent_auto_revoked(agent_id)
         agents.append({
             "agent_id": agent_id,

@@ -10,7 +10,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 from app.protocols.mcp_server import handle_mcp_request, get_mcp_server_info, MCP_TOOLS
-from app.protocols.a2a_server import handle_a2a_request, get_agent_card, get_a2a_server_info
+from app.protocols.a2a_server import handle_a2a_request, get_agent_card, get_a2a_server_info, run_a2a_delegation_demo
 
 router = APIRouter(prefix="/protocols", tags=["MCP / A2A Protocols"])
 
@@ -230,6 +230,16 @@ async def a2a_demo():
         "protocol": "A2A",
         "tasks_count": len(list_resp.get("result", {}).get("tasks", [])),
         "key_point": "A2A 的任务生命周期管理，支持长时间运行和人工介入场景",
+    })
+
+    delegation_demo = run_a2a_delegation_demo()
+    steps.append({
+        "step": 5,
+        "action": "A2A 跨Agent委派调用 — doc_agent → data_agent",
+        "protocol": "A2A + JWT Delegation Chain",
+        "chain_evidence": delegation_demo.get("chain_evidence", {}),
+        "flow": [s["action"] for s in delegation_demo.get("flow_steps", [])],
+        "key_point": "跨Agent调用必须携带JWT委派Token，每一步验证签名和chain完整性",
     })
 
     return {

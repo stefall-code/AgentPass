@@ -49,24 +49,33 @@ class ConnectionManager:
         try:
             self._queue.put_nowait(event)
         except asyncio.QueueFull:
-            logger.warning("audit event queue full, dropping event")
+            logger.warning("audit event queue full, dropping event: action=%s agent=%s", event.get("action"), event.get("agent_id"))
+        except Exception as e:
+            logger.warning("emit_audit failed: %s", e)
 
     async def broadcast_audit(self, event: dict):
         await self.broadcast(json.dumps(event, ensure_ascii=False))
 
     async def _consume_loop(self):
         while True:
-            event = await self._queue.get()
-            if event is None:
-                break
             try:
-                await self.broadcast(json.dumps(event, ensure_ascii=False))
+                event = await self._queue.get()
+                if event is None:
+                    break
+                try:
+                    await self.broadcast(json.dumps(event, ensure_ascii=False))
+                except Exception:
+                    logger.exception("failed to broadcast audit event")
+            except asyncio.CancelledError:
+                break
             except Exception:
-                logger.exception("failed to broadcast audit event")
+                logger.exception("audit consume loop error, continuing")
+                await asyncio.sleep(0.1)
 
     def start_consumer(self):
         if self._consumer_task is None or self._consumer_task.done():
             self._consumer_task = asyncio.ensure_future(self._consume_loop())
+            logger.info("WebSocket audit consumer started")
 
     async def stop_consumer(self):
         await self._queue.put(None)

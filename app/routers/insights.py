@@ -356,7 +356,9 @@ def reputation_ranking(
 ) -> List[ReputationRankingItem]:
     from app.services.reputation_service import ReputationEngine
     engine = ReputationEngine()
-    return engine.get_ranking()
+    ranking = engine.get_ranking()
+    CORE_AGENT_IDS = {"doc_agent", "data_agent", "external_agent"}
+    return [r for r in ranking if r["agent_id"] in CORE_AGENT_IDS]
 
 
 @insight_router.get("/reputation/{agent_id}", response_model=ReputationResponse)

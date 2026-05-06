@@ -24,7 +24,7 @@ class LoginRequest(BaseModel):
     agent_id: str
     api_key: str
     bound_ip: str | None = None
-    usage_limit: int = Field(default=30, ge=1, le=1000)
+    usage_limit: int = Field(default=1000, ge=1, le=1000)
     expires_in_minutes: int = Field(default=60, ge=5, le=1440)
 
 
@@ -50,7 +50,7 @@ class BatchLoginItemRequest(BaseModel):
     agent_id: str
     api_key: str
     bound_ip: str | None = None
-    usage_limit: int = Field(default=30, ge=1, le=1000)
+    usage_limit: int = Field(default=1000, ge=1, le=1000)
     expires_in_minutes: int = Field(default=60, ge=5, le=1440)
 
 

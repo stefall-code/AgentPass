@@ -37,7 +37,7 @@ _TASK_ARTIFACTS: Dict[str, List[Dict[str, Any]]] = {}
 
 
 def get_agent_card() -> Dict[str, Any]:
-    base_url = os.environ.get("FEISHU_PUBLIC_URL", f"http://127.0.0.1:{settings.PORT}")
+    base_url = f"http://127.0.0.1:{settings.PORT}"
     return {
         "schemaVersion": "0.2.6",
         "name": "Agent IAM Security Server",
@@ -264,62 +264,132 @@ def _extract_text(message: Dict) -> str:
     return " ".join(texts)
 
 
+_SKILL_ROUTERS = {
+    "prompt-defense": {
+        "keywords": ["prompt", "injection", "注入", "攻击", "defense", "防御"],
+        "handler": "_handle_prompt_defense",
+    },
+    "alignment-check": {
+        "keywords": ["alignment", "对齐", "hijack", "劫持", "drift", "漂移"],
+        "handler": "_handle_alignment_check",
+    },
+    "iam-check": {
+        "keywords": ["permission", "权限", "trust", "信任", "iam", "capability", "能力"],
+        "handler": "_handle_iam_check",
+    },
+    "credential-broker": {
+        "keywords": ["credential", "凭证", "broker", "key", "密钥"],
+        "handler": "_handle_credential_broker",
+    },
+    "revocation": {
+        "keywords": ["revoke", "撤销", "cascade", "级联", "封禁"],
+        "handler": "_handle_revocation",
+    },
+    "delegation": {
+        "keywords": ["delegate", "委派", "chain", "链", "token"],
+        "handler": "_handle_delegation",
+    },
+    "governance-audit": {
+        "keywords": ["audit", "审计", "governance", "治理", "compliance", "合规"],
+        "handler": "_handle_governance_audit",
+    },
+}
+
+
+def _handle_prompt_defense(text: str, task_id: str) -> str:
+    try:
+        from agentpass_sdk.src.agentpass.prompt_defense import PromptDefenseEngine
+        engine = PromptDefenseEngine()
+        result = engine.analyze(text)
+        return json.dumps({
+            "service": "prompt-defense",
+            "analysis": result,
+            "task_id": task_id,
+        }, indent=2, ensure_ascii=False)
+    except Exception as e:
+        return json.dumps({"service": "prompt-defense", "error": str(e), "task_id": task_id})
+
+
+def _handle_alignment_check(text: str, task_id: str) -> str:
+    return json.dumps({
+        "service": "alignment-check",
+        "message": "Use defense.check_alignment MCP tool with original_message and agent_output parameters",
+        "task_id": task_id,
+    }, indent=2, ensure_ascii=False)
+
+
+def _handle_iam_check(text: str, task_id: str) -> str:
+    try:
+        from app.delegation.engine import get_trust_score, CAPABILITY_AGENTS
+        scores = {aid: get_trust_score(aid) for aid in CAPABILITY_AGENTS}
+        return json.dumps({
+            "service": "iam",
+            "trust_scores": scores,
+            "task_id": task_id,
+        }, indent=2, ensure_ascii=False)
+    except Exception as e:
+        return json.dumps({"service": "iam", "error": str(e), "task_id": task_id})
+
+
+def _handle_credential_broker(text: str, task_id: str) -> str:
+    return json.dumps({
+        "service": "credential-broker",
+        "message": "Use broker.request_access or broker.execute MCP tools",
+        "task_id": task_id,
+    }, indent=2, ensure_ascii=False)
+
+
+def _handle_revocation(text: str, task_id: str) -> str:
+    return json.dumps({
+        "service": "4-level-revocation",
+        "levels": {"L1": "token", "L2": "agent", "L3": "task", "L4": "chain-cascade"},
+        "message": "Use iam.revoke MCP tool with cascade=true for L4",
+        "task_id": task_id,
+    }, indent=2, ensure_ascii=False)
+
+
+def _handle_delegation(text: str, task_id: str) -> str:
+    try:
+        from app.delegation.engine import CAPABILITY_AGENTS, get_all_trust_scores
+        trust_info = get_all_trust_scores()
+        return json.dumps({
+            "service": "delegation",
+            "agents": list(CAPABILITY_AGENTS.keys()),
+            "trust_info": trust_info,
+            "task_id": task_id,
+        }, indent=2, ensure_ascii=False)
+    except Exception as e:
+        return json.dumps({"service": "delegation", "error": str(e), "task_id": task_id})
+
+
+def _handle_governance_audit(text: str, task_id: str) -> str:
+    try:
+        from app import audit
+        summary = audit.get_audit_summary()
+        return json.dumps({
+            "service": "governance-audit",
+            "summary": summary,
+            "task_id": task_id,
+        }, indent=2, ensure_ascii=False)
+    except Exception as e:
+        return json.dumps({"service": "governance-audit", "error": str(e), "task_id": task_id})
+
+
 def _process_agent_message(text: str, task_id: str) -> str:
     text_lower = text.lower()
 
-    if any(kw in text_lower for kw in ["prompt", "injection", "注入", "攻击"]):
-        try:
-            from agentpass_sdk.src.agentpass.prompt_defense import PromptDefenseEngine
-            engine = PromptDefenseEngine()
-            result = engine.analyze(text)
-            return json.dumps({
-                "service": "prompt-defense",
-                "analysis": result,
-                "task_id": task_id,
-            }, indent=2, ensure_ascii=False)
-        except Exception as e:
-            return f"Prompt defense analysis error: {e}"
+    for skill_id, router in _SKILL_ROUTERS.items():
+        if any(kw in text_lower for kw in router["keywords"]):
+            handler_name = router["handler"]
+            handler = globals().get(handler_name)
+            if handler:
+                return handler(text, task_id)
 
-    elif any(kw in text_lower for kw in ["alignment", "对齐", "hijack", "劫持"]):
-        return json.dumps({
-            "service": "alignment-check",
-            "message": "Use defense.check_alignment MCP tool with original_message and agent_output parameters",
-            "task_id": task_id,
-        }, indent=2, ensure_ascii=False)
-
-    elif any(kw in text_lower for kw in ["permission", "权限", "trust", "信任"]):
-        try:
-            from app.delegation.engine import get_trust_score, CAPABILITY_AGENTS
-            scores = {aid: get_trust_score(aid) for aid in CAPABILITY_AGENTS}
-            return json.dumps({
-                "service": "iam",
-                "trust_scores": scores,
-                "task_id": task_id,
-            }, indent=2, ensure_ascii=False)
-        except Exception as e:
-            return f"IAM check error: {e}"
-
-    elif any(kw in text_lower for kw in ["credential", "凭证", "broker", "key"]):
-        return json.dumps({
-            "service": "credential-broker",
-            "message": "Use broker.request_access or broker.execute MCP tools",
-            "task_id": task_id,
-        }, indent=2, ensure_ascii=False)
-
-    elif any(kw in text_lower for kw in ["revoke", "撤销", "cascade"]):
-        return json.dumps({
-            "service": "4-level-revocation",
-            "levels": {"L1": "token", "L2": "agent", "L3": "task", "L4": "chain-cascade"},
-            "message": "Use iam.revoke MCP tool with cascade=true for L4",
-            "task_id": task_id,
-        }, indent=2, ensure_ascii=False)
-
-    else:
-        return json.dumps({
-            "service": "agent-iam",
-            "message": "Agent IAM Security Server ready. Available skills: prompt-defense, alignment-check, iam-check, delegation, revocation, credential-broker, governance-audit",
-            "task_id": task_id,
-        }, indent=2, ensure_ascii=False)
+    return json.dumps({
+        "service": "agent-iam",
+        "message": "Agent IAM Security Server ready. Available skills: " + ", ".join(_SKILL_ROUTERS.keys()),
+        "task_id": task_id,
+    }, indent=2, ensure_ascii=False)
 
 
 def get_a2a_server_info() -> Dict[str, Any]:
@@ -335,4 +405,137 @@ def get_a2a_server_info() -> Dict[str, Any]:
             "a2a": "/api/protocols/a2a",
         },
         "task_states": TASK_STATES,
+    }
+
+
+def run_a2a_delegation_demo() -> Dict[str, Any]:
+    steps = []
+
+    steps.append({
+        "step": 1,
+        "action": "user → doc_agent: 用户发起财务查询请求",
+        "a2a_method": "message/send",
+        "request": {
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "message/send",
+            "params": {
+                "message": {
+                    "role": "user",
+                    "parts": [{"type": "text", "text": "查询Q1财务数据"}],
+                },
+            },
+        },
+    })
+
+    steps.append({
+        "step": 2,
+        "action": "doc_agent → IAM: 六层安全验证",
+        "a2a_method": "message/send (skill: iam-check)",
+        "request": {
+            "jsonrpc": "2.0",
+            "id": 2,
+            "method": "message/send",
+            "params": {
+                "message": {
+                    "role": "agent",
+                    "parts": [{"type": "text", "text": "permission check for doc_agent read:feishu_table:finance"}],
+                },
+            },
+        },
+    })
+
+    steps.append({
+        "step": 3,
+        "action": "doc_agent → data_agent: 委派数据查询（JWT委派链）",
+        "a2a_method": "message/send (skill: delegation)",
+        "delegation_token": "doc_agent签发JWT委派Token，chain=[user, doc_agent, data_agent]",
+        "request": {
+            "jsonrpc": "2.0",
+            "id": 3,
+            "method": "message/send",
+            "params": {
+                "message": {
+                    "role": "agent",
+                    "parts": [{"type": "text", "text": "delegate read:feishu_table:finance to data_agent"}],
+                },
+            },
+        },
+    })
+
+    steps.append({
+        "step": 4,
+        "action": "data_agent → credential_broker: 请求凭证注入",
+        "a2a_method": "message/send (skill: credential-broker)",
+        "request": {
+            "jsonrpc": "2.0",
+            "id": 4,
+            "method": "message/send",
+            "params": {
+                "message": {
+                    "role": "agent",
+                    "parts": [{"type": "text", "text": "credential broker access feishu_table:finance"}],
+                },
+            },
+        },
+    })
+
+    steps.append({
+        "step": 5,
+        "action": "credential_broker → feishu API: 凭证注入后调用飞书API",
+        "detail": "Broker持有真实凭证，Agent不接触凭证，仅获得查询结果",
+    })
+
+    steps.append({
+        "step": 6,
+        "action": "data_agent → doc_agent → user: 返回查询结果",
+        "a2a_method": "tasks/get",
+        "result": "查询结果沿委派链返回，每一步都有审计记录",
+    })
+
+    try:
+        from app.delegation.engine import DelegationEngine
+        engine = DelegationEngine()
+
+        root_token = engine.issue_root_token(
+            agent_id="doc_agent",
+            delegated_user="user_001",
+            capabilities=["read:feishu_table:finance", "delegate:data_agent"],
+            expires_in_minutes=30,
+        )
+        root_decoded = engine.decode_delegation_token(root_token)
+
+        delegation_result = engine.delegate(
+            parent_token=root_token,
+            target_agent="data_agent",
+            action="read:feishu_table:finance",
+            caller_agent="doc_agent",
+        )
+
+        chain_evidence = {
+            "root_token_jti": root_decoded.get("jti", "")[:12],
+            "root_chain": root_decoded.get("chain", []),
+            "delegation_success": delegation_result.success,
+        }
+
+        if delegation_result.success and delegation_result.token:
+            del_decoded = engine.decode_delegation_token(delegation_result.token)
+            chain_evidence["delegated_token_jti"] = del_decoded.get("jti", "")[:12]
+            chain_evidence["delegated_chain"] = del_decoded.get("chain", [])
+            chain_evidence["delegated_capabilities"] = del_decoded.get("capabilities", [])
+    except Exception as e:
+        chain_evidence = {"error": str(e)[:100]}
+
+    return {
+        "title": "A2A 跨Agent委派调用演示",
+        "description": "展示A2A协议下的跨Agent安全委派调用流程",
+        "protocol": "A2A v0.2.6 (JSON-RPC 2.0)",
+        "flow_steps": steps,
+        "chain_evidence": chain_evidence,
+        "key_points": [
+            "每一步Agent间通信都通过A2A JSON-RPC 2.0协议",
+            "委派必须携带JWT Token，验证签名和chain完整性",
+            "Agent不直接持有凭证，通过Credential Broker注入",
+            "所有操作记录在审计日志中，形成完整追踪链",
+        ],
     }
