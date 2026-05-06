@@ -1,0 +1,126 @@
+{
+  "passed": 23,
+  "failed": 1,
+  "details": [
+    {
+      "name": "from agentpass import Guard",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "版本检查",
+      "status": "FAIL",
+      "detail": "expected 0.1.0, got 0.3.0"
+    },
+    {
+      "name": "Policy 模块导入",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "Audit 模块导入",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "Risk 模块导入",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "FastAPI 集成导入",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "依赖检查 (jwt, pydantic, yaml)",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "Guard 初始化",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "Token 签发",
+      "status": "PASS",
+      "detail": "token=eyJhbGciOiJIUzI1NiIsInR5cCI6Ik..."
+    },
+    {
+      "name": "Token 验证",
+      "status": "PASS",
+      "detail": "sub=agent_1, role=admin"
+    },
+    {
+      "name": "权限检查-允许",
+      "status": "PASS",
+      "detail": "allowed=True"
+    },
+    {
+      "name": "权限检查-拒绝",
+      "status": "PASS",
+      "detail": "allowed=False"
+    },
+    {
+      "name": "assess_and_protect",
+      "status": "PASS",
+      "detail": "decision=deny"
+    },
+    {
+      "name": "Policy 创建",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "DENY_OVERRIDE 策略",
+      "status": "PASS",
+      "detail": "deny 优先"
+    },
+    {
+      "name": "ALLOW_OVERRIDE 策略",
+      "status": "PASS",
+      "detail": "allow 优先"
+    },
+    {
+      "name": "条件-ip 匹配",
+      "status": "PASS",
+      "detail": "私有 IP 匹配成功"
+    },
+    {
+      "name": "条件-role 匹配",
+      "status": "PASS",
+      "detail": "角色匹配成功"
+    },
+    {
+      "name": "explain() 方法",
+      "status": "PASS",
+      "detail": "matched_rules=2"
+    },
+    {
+      "name": "YAML 导出",
+      "status": "PASS",
+      "detail": "length=310"
+    },
+    {
+      "name": "YAML 加载",
+      "status": "PASS",
+      "detail": "id=explain_test"
+    },
+    {
+      "name": "Audit 初始化",
+      "status": "PASS",
+      "detail": ""
+    },
+    {
+      "name": "事件记录",
+      "status": "PASS",
+      "detail": "event_id=dfc9b3e1-42bf-46d1-9682-8ac2729eed95"
+    },
+    {
+      "name": "事件查询",
+      "status": "PASS",
+      "detail": "count=0"
+    }
+  ]
+}
