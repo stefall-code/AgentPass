@@ -3,9 +3,9 @@ Alignment Check API Router
 """
 from fastapi import APIRouter
 from pydantic import BaseModel
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict, Any
 
-from app.security.alignment import check_alignment, get_alignment_engine
+from app.security.alignment import check_alignment
 from app.orchestrator.alignment_guard import run_task_with_alignment, get_alignment_stats
 
 router = APIRouter(prefix="/alignment", tags=["Alignment Checks"])

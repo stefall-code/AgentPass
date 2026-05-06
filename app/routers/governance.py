@@ -2,13 +2,12 @@ from __future__ import annotations
 
 import json
 import logging
-import time
 import uuid
 from typing import Dict, Any, List, Optional
 from fastapi import APIRouter
 from pydantic import BaseModel
 
-from app.orchestrator.orchestrator import run_task, get_event_log, EVENT_LOG
+from app.orchestrator.orchestrator import run_task
 from app.delegation.engine import (
     get_trust_score,
     revoke_tokens_by_agent,

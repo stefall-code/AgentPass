@@ -26,7 +26,7 @@ import time
 import uuid
 from datetime import datetime, timezone
 from typing import Dict, List, Any, Optional, Set
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 from app.config import settings
 
@@ -267,7 +267,6 @@ def _execute_service_call(
     credentials: Dict[str, str],
     params: Dict[str, Any],
 ) -> Dict[str, Any]:
-    import httpx
 
     if service == "feishu":
         return _execute_feishu(operation, credentials, params)

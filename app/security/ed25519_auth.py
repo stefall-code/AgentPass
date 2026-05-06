@@ -18,7 +18,7 @@ import os
 import time
 import uuid
 from datetime import datetime, timezone
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, List
 
 from nacl.signing import SigningKey, VerifyKey
 from nacl.exceptions import BadSignatureError

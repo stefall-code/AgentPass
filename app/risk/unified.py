@@ -1,4 +1,4 @@
-from typing import Dict, List, Optional
+from typing import Dict, List
 from datetime import datetime
 import random
 from collections import defaultdict

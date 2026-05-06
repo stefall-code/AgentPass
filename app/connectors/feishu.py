@@ -1,7 +1,7 @@
 import logging
 import time
-from typing import List, Dict, Any, Optional
-from datetime import datetime, timedelta
+from typing import List, Dict, Any
+from datetime import datetime
 
 from .base import BaseConnector
 

@@ -3,17 +3,16 @@ OWASP Agentic Top 10 Shield API Router
 """
 from __future__ import annotations
 
-from typing import Dict, Any, List, Optional
+from typing import List, Optional
 from fastapi import APIRouter
 from pydantic import BaseModel, Field
 
 from app.security.owasp_shield import (
     register_tool, verify_tool_access, get_supply_chain_status,
     scan_code, get_codeshield_stats,
-    write_memory, read_memory, verify_memory_integrity, poison_memory, get_memory_stats,
-    register_agent_zone, report_failure, check_agent_available, check_cross_agent_call,
+    write_memory, read_memory, verify_memory_integrity, poison_memory, register_agent_zone, report_failure, check_cross_agent_call,
     reset_circuit_breaker, get_cascade_status, get_owasp_status,
-    set_agent_budget, record_cost, check_budget, get_cost_report, reset_daily_budgets, get_wallet_stats,
+    set_agent_budget, record_cost, check_budget, get_cost_report, reset_daily_budgets,
 )
 
 router = APIRouter(prefix="/owasp", tags=["OWASP Agentic Top 10"])
@@ -332,7 +331,7 @@ async def owasp_demo():
         "risk": "ASI09 Denial of Wallet",
         "requests": 5,
         "daily_usage_pct": budget_check_1.get("daily_usage_pct", 0),
-        "action": budget_check_1.get("action", "allow"),
+        "budget_action": budget_check_1.get("action", "allow"),
         "key_point": "5 次 GPT-4o 请求后，data_agent 消费仍在预算内，正常放行",
         "level": "asi09_normal",
     })
@@ -347,7 +346,7 @@ async def owasp_demo():
         "action": "ASI09: 预算告警 — 80% 阈值触发节流",
         "risk": "ASI09 Denial of Wallet",
         "daily_usage_pct": budget_check_2.get("daily_usage_pct", 0),
-        "action": budget_check_2.get("action", "throttle"),
+        "budget_action": budget_check_2.get("action", "throttle"),
         "reason": budget_check_2.get("reason", ""),
         "key_point": "消费超过 80% 预算时自动节流（throttle），请求延迟增加，防止预算失控",
         "level": "asi09_throttle",
@@ -363,7 +362,7 @@ async def owasp_demo():
         "action": "ASI09: 预算阻断 — 95% 硬限制触发封停",
         "risk": "ASI09 Denial of Wallet",
         "daily_usage_pct": budget_check_3.get("daily_usage_pct", 0),
-        "action": budget_check_3.get("action", "block"),
+        "budget_action": budget_check_3.get("action", "block"),
         "reason": budget_check_3.get("reason", ""),
         "key_point": "消费超过 95% 硬限制时自动阻断（block），Agent 无法再发起请求，防止钱包被掏空",
         "level": "asi09_block",

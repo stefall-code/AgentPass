@@ -21,8 +21,7 @@ from typing import Dict, Any, List, Optional
 from dataclasses import dataclass, field
 
 from app.security.owasp_shield import (
-    scan_code, verify_memory_integrity, check_agent_available,
-    check_cross_agent_call, check_budget,
+    verify_memory_integrity, check_budget,
 )
 from app.security.ed25519_auth import get_agent_auth_info
 from app.security.declarative_policy import evaluate_policy
@@ -128,7 +127,7 @@ def verify_six_layers(
     # === L6: Observability ===
     try:
         l6 = _verify_observability(request_id, agent_id, action)
-    except Exception as e:
+    except Exception:
         l6 = LayerResult(layer_id="L6", layer_name="Observability", status="pass", icon="📊", detail="已记录（降级模式）", data={})
     layers.append(l6)
 

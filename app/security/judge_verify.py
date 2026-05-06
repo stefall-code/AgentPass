@@ -14,11 +14,9 @@ from __future__ import annotations
 
 import json
 import time
-import hashlib
-from datetime import datetime, timezone
-from typing import Dict, Any, List
+from typing import Dict, Any
 
-from app.delegation.engine import DelegationEngine, get_trust_score
+from app.delegation.engine import DelegationEngine
 from app.security.six_layer_verify import verify_six_layers
 from app.audit import log_event, fetch_logs_filtered
 

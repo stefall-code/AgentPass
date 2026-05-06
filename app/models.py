@@ -1,8 +1,6 @@
 from pydantic import BaseModel, Field
-from typing import Optional, Dict, Any, List
-from datetime import datetime
-from sqlalchemy import Column, Integer, Float, String, Text, Boolean, DateTime, ForeignKey
-from sqlalchemy.orm import relationship
+from typing import Optional
+from sqlalchemy import Column, Integer, Float, String, Text, ForeignKey
 from app.db import Base
 
 

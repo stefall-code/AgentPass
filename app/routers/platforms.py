@@ -1,9 +1,6 @@
 from fastapi import APIRouter, HTTPException, Query
-from fastapi.responses import FileResponse
 from typing import List, Dict, Any, Optional
 from pydantic import BaseModel
-import asyncio
-from datetime import datetime, timedelta
 import logging
 
 from app.connectors import (

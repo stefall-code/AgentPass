@@ -4,7 +4,7 @@ import hashlib
 import json
 import re
 import asyncio
-from typing import Dict, Any, Optional, List, Union
+from typing import Dict, Any, Optional
 from app.delegation.engine import DelegationEngine, get_trust_score
 from app.platform import PlatformRequest, calculate_platform_risk
 from app.config import settings
@@ -631,7 +631,7 @@ def _execute_external_agent(action: str, message: str = "") -> Dict[str, Any]:
         }
 
     doc_lines = []
-    doc_lines.append(f"外部检索报告")
+    doc_lines.append("外部检索报告")
     doc_lines.append(f"搜索关键词: {search_query}")
     doc_lines.append(f"结果数量: {len(search_results)}")
     doc_lines.append("")
@@ -672,7 +672,7 @@ def _execute_external_agent(action: str, message: str = "") -> Dict[str, Any]:
     except Exception as e:
         logger.warning("Failed to create external search doc: %s", e)
 
-    result_lines = [f"🌐 外部搜索完成", f""]
+    result_lines = ["🌐 外部搜索完成", ""]
     result_lines.append(f"搜索关键词: {search_query}")
     result_lines.append(f"找到 {len(search_results)} 条结果")
     result_lines.append("")
@@ -681,7 +681,7 @@ def _execute_external_agent(action: str, message: str = "") -> Dict[str, Any]:
         result_lines.append(f"   🔗 {r.get('url', '')}")
     result_lines.append("")
     if doc_url:
-        result_lines.append(f"📄 搜索报告已保存到飞书文档")
+        result_lines.append("📄 搜索报告已保存到飞书文档")
         result_lines.append(f"🔗 点击查看: {doc_url}")
 
     return {
@@ -714,7 +714,7 @@ def _format_success(user_id: str, content: str, chain: list, capability: str, tr
     chain_str = " → ".join(chain) if chain else "direct"
     trust_str = f"{trust_score:.2f}" if trust_score is not None else "—"
     lines = [
-        f"✅ 操作成功",
+        "✅ 操作成功",
         content,
         "",
         f"🤖 Agent路径：{chain_str}",
@@ -732,7 +732,7 @@ def _format_denied(human_reason: str, chain: list, capability: str, trust_score:
         "",
         f"🔐 缺失能力：{capability}",
         f"🏆 当前信任：{trust_str}",
-        f"⚠️ 已记录审计日志",
+        "⚠️ 已记录审计日志",
     ]
     return "\n".join(lines)
 
@@ -777,7 +777,7 @@ def run_task(user_id: str = "", message: str = "", platform_request: PlatformReq
                 "platform": platform,
                 "prompt_risk": prompt_risk,
                 "hitl_approval_id": hitl_result.get("approval_id", ""),
-                "platform_risk": platform_risk if 'platform_risk' in dir() else 0.3,
+                "platform_risk": risk_context.get("platform_risk", 0.3),
             }
         elif hitl_result and hitl_result.get("status") == "denied":
             logger.info("HITL: auto-denied by timeout policy")
@@ -789,7 +789,7 @@ def run_task(user_id: str = "", message: str = "", platform_request: PlatformReq
                 "trust_score": get_trust_score("doc_agent"),
                 "platform": platform,
                 "prompt_risk": prompt_risk,
-                "platform_risk": platform_risk if 'platform_risk' in dir() else 0.3,
+                "platform_risk": risk_context.get("platform_risk", 0.3),
             }
 
     logger.info("run_task: user=%s message='%s' platform=%s task_type=%s target_agent=%s action=%s attack=%s prompt_risk=%.2f", user_id, message[:50], platform, task_type, target_agent, target_action, is_attack, prompt_risk["risk_score"])
@@ -859,7 +859,7 @@ def run_task(user_id: str = "", message: str = "", platform_request: PlatformReq
                     formatted += f"  {layer.icon} {layer.layer_id} {layer.layer_name}: ❌ {layer.detail}\n"
             formatted += f"\n📊 整体状态：{six_layer_result.overall_status}\n"
             formatted += f"🔐 最终决策：{six_layer_result.final_decision}\n"
-            formatted += f"⚠️ 已记录审计日志"
+            formatted += "⚠️ 已记录审计日志"
             _log_event(user_id, message, "doc_agent", target_action, "six_layer_blocked", None, {"six_layer": six_layer_result.to_dict(), "prompt_risk": prompt_risk}, platform=platform, delegation_chain=chain)
             return {"status": "denied", "content": formatted, "chain": chain, "capability": target_action, "trust_score": get_trust_score("doc_agent"), "platform": platform, "six_layer": six_layer_result.to_dict(), "prompt_risk": prompt_risk}
     except Exception as e:
@@ -942,7 +942,7 @@ def run_task(user_id: str = "", message: str = "", platform_request: PlatformReq
                 auto_revoked = agent_result.get("auto_revoked", False)
 
                 dynamic_auth_lines = []
-                dynamic_auth_lines.append(f"🔄 动态授权追踪")
+                dynamic_auth_lines.append("🔄 动态授权追踪")
                 dynamic_auth_lines.append(f"  Agent: {target_agent}")
                 dynamic_auth_lines.append(f"  请求能力: {target_action}")
                 dynamic_auth_lines.append(f"  信任分变化: {trust_before:.2f} → {trust_after:.2f}")
@@ -984,7 +984,7 @@ def _handle_collaborative_task(user_id: str, message: str, engine: DelegationEng
     chain = ["user:" + user_id, "doc_agent"]
     capabilities = AGENT_CAPABILITIES.get("doc_agent", ["read:doc", "write:doc:public", "delegate:data_agent", "delegate:external_agent"])
 
-    from app.delegation.engine import AUTO_REVOKED_AGENTS, is_agent_auto_revoked, try_cooldown_recover, REVOKED_AGENTS, AGENT_TRUST_SCORE, TRUST_THRESHOLD, _persist_trust_score
+    from app.delegation.engine import AUTO_REVOKED_AGENTS, is_agent_auto_revoked, REVOKED_AGENTS, AGENT_TRUST_SCORE, TRUST_THRESHOLD, _persist_trust_score
     for aid in ["doc_agent", "data_agent", "external_agent"]:
         revoked, _ = is_agent_auto_revoked(aid)
         if revoked:
@@ -1082,11 +1082,11 @@ def _handle_collaborative_task(user_id: str, message: str, engine: DelegationEng
         "",
         "━━━ 委派链路 ━━━",
         f"👤 user:{user_id}",
-        f"  ↓ 委派",
+        "  ↓ 委派",
         f"📄 doc_agent（协调者 · {AGENT_REGISTRY['doc_agent']['inference_engine']['name']}）",
         f"  ↓ 委派 → 📊 data_agent（内部数据 · {AGENT_REGISTRY['data_agent']['inference_engine']['name']}）{' ✅' if data_status=='success' else ' ⚠️ ' + data_status.upper()}",
         f"  ↓ 委派 → 🌐 external_agent（外部搜索 · {AGENT_REGISTRY['external_agent']['inference_engine']['name']}）{' ✅' if external_status=='success' else ' ⚠️ ' + external_status.upper()}",
-        f"  ↓ 汇总 → 📄 doc_agent（生成报告）",
+        "  ↓ 汇总 → 📄 doc_agent（生成报告）",
     ]
 
     if has_degradation:
@@ -1140,7 +1140,7 @@ def _handle_collaborative_task(user_id: str, message: str, engine: DelegationEng
         logger.warning("Failed to create collaborative doc: %s", e)
 
     if doc_url:
-        report_lines.append(f"📄 报告已保存到飞书文档")
+        report_lines.append("📄 报告已保存到飞书文档")
         report_lines.append(f"🔗 点击查看: {doc_url}")
 
     report_lines.extend([
@@ -1770,7 +1770,7 @@ def _generate_report(user_id: str, data_result: Dict[str, Any]) -> str:
     if not data:
         return "📊 报告生成失败：无数据"
 
-    lines = ["📋 业务数据报告", "", f"👤 请求人: {user_id}", f"🤖 执行Agent: doc_agent → data_agent", f"🔐 安全链路: IAM校验通过 ✓", "", "---", ""]
+    lines = ["📋 业务数据报告", "", f"👤 请求人: {user_id}", "🤖 执行Agent: doc_agent → data_agent", "🔐 安全链路: IAM校验通过 ✓", "", "---", ""]
     if isinstance(data, list):
         for idx, row in enumerate(data, 1):
             lines.append(f"  记录 {idx}")
@@ -1794,7 +1794,6 @@ def _submit_hitl_approval(user_id: str, message: str, action: str, risk_score: f
     try:
         from app.db import SessionLocal
         from app.models import ApprovalRequest
-        from app import database
 
         with SessionLocal() as db:
             from datetime import datetime, timezone, timedelta

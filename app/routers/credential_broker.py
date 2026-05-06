@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field
 
 from app.security.credential_broker import (
     request_access, execute_via_broker, register_credential,
-    revoke_lease, get_lease_info, list_leases,
+    revoke_lease, list_leases,
     get_agent_scopes, set_agent_scope,
     list_vault_entries, get_access_log, get_broker_stats,
 )

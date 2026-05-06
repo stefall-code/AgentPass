@@ -10,10 +10,10 @@ from __future__ import annotations
 
 import logging
 import time
-from typing import Dict, Any, Optional
+from typing import Dict, Any
 
 from app.security.alignment import check_alignment, AlignmentResult
-from app.orchestrator.orchestrator import run_task, get_trust_score
+from app.orchestrator.orchestrator import run_task
 
 logger = logging.getLogger("agent_system")
 
@@ -151,25 +151,25 @@ def _format_alignment_block(alignment: AlignmentResult, original_output: str) ->
     lines = ["🛡️ 输出对齐检查未通过", ""]
 
     if alignment.goal_hijack and alignment.goal_hijack.get("detected"):
-        lines.append(f"⚠️ 目标偏移检测：Agent 输出偏离了原始意图")
+        lines.append("⚠️ 目标偏移检测：Agent 输出偏离了原始意图")
         if alignment.goal_hijack.get("type"):
             lines.append(f"   类型：{alignment.goal_hijack['type']}")
         lines.append("")
 
     if alignment.indirect_injection and alignment.indirect_injection.get("detected"):
-        lines.append(f"⚠️ 间接注入检测：输出中包含可疑的后续操作指令")
+        lines.append("⚠️ 间接注入检测：输出中包含可疑的后续操作指令")
         if alignment.indirect_injection.get("type"):
             lines.append(f"   类型：{alignment.indirect_injection['type']}")
         lines.append("")
 
     if alignment.dlp_leak and alignment.dlp_leak.get("leaked"):
-        lines.append(f"⚠️ 敏感信息泄露：输出中包含不应暴露的敏感数据")
+        lines.append("⚠️ 敏感信息泄露：输出中包含不应暴露的敏感数据")
         if alignment.dlp_leak.get("leak_types"):
             lines.append(f"   类型：{', '.join(alignment.dlp_leak['leak_types'])}")
         lines.append("")
 
     lines.append(f"📊 风险评分：{alignment.risk_score:.2f}")
-    lines.append(f"🔐 处置：输出已拦截")
+    lines.append("🔐 处置：输出已拦截")
 
     return "\n".join(lines)
 

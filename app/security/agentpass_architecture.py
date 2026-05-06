@@ -15,13 +15,12 @@ Core Innovation: Semantic-driven IAM
 """
 from __future__ import annotations
 
-import json
 from datetime import datetime, timezone
-from typing import Dict, Any, List
+from typing import Dict, Any
 
 from app.security.owasp_shield import get_owasp_status
 from app.security.ed25519_auth import get_ed25519_status
-from app.security.declarative_policy import get_policy_engine_status, evaluate_policy
+from app.security.declarative_policy import get_policy_engine_status
 from app.security.siem_integration import get_siem_status
 from app.security.nl_translator import get_nl_translator_status
 
@@ -220,7 +219,7 @@ def get_core_innovation_demo() -> Dict[str, Any]:
         "phase": "AgentPass L4: Behavior Layer",
         "title": "🔥 Risk → Trust Score 衰减",
         "description": "风险评分直接驱动信任评分变化",
-        "flow": f"Risk 0.8 → Trust Score 衰减 → 从 0.85 降至 0.65",
+        "flow": "Risk 0.8 → Trust Score 衰减 → 从 0.85 降至 0.65",
         "detail": {
             "before_trust": 0.85,
             "risk_event": "Prompt Injection detected (risk=0.8)",

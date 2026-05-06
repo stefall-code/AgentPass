@@ -91,7 +91,7 @@ def gateway_map_action(req: GatewayMapRequest) -> Dict[str, Any]:
 
 @router.post("/demo/escalation")
 def gateway_demo_escalation() -> Dict[str, Any]:
-    from ..delegation.engine import clear_used_tokens, USED_TOKENS
+    from ..delegation.engine import clear_used_tokens
     clear_used_tokens()
 
     results = []
@@ -118,7 +118,7 @@ def gateway_demo_escalation() -> Dict[str, Any]:
 
 @router.post("/demo/bypass-attempt")
 def gateway_demo_bypass() -> Dict[str, Any]:
-    from ..delegation.engine import clear_used_tokens, USED_TOKENS
+    from ..delegation.engine import clear_used_tokens
     clear_used_tokens()
 
     results = []

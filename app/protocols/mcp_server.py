@@ -23,10 +23,8 @@ from __future__ import annotations
 
 import json
 import logging
-import time
-import uuid
 from typing import Dict, List, Any, Optional
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 logger = logging.getLogger("agent_system")
 
@@ -284,7 +282,7 @@ def _execute_tool(tool_name: str, arguments: Dict[str, Any]) -> MCPToolResult:
 
 
 def _tool_check_permission(args: Dict) -> MCPToolResult:
-    from app.delegation.engine import DelegationEngine, CAPABILITY_AGENTS, get_trust_score
+    from app.delegation.engine import CAPABILITY_AGENTS, get_trust_score
     agent_id = args.get("agent_id", "")
     action = args.get("action", "")
     trust = get_trust_score(agent_id)

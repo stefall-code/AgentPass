@@ -13,13 +13,12 @@ Key Extensions over standard OAuth 2.0 / OIDC:
 """
 from __future__ import annotations
 
-import json
 import logging
 import time
 import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Any, Optional
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 import jwt
 

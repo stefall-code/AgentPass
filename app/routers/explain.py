@@ -12,7 +12,6 @@ from app.delegation.engine import (
     is_agent_auto_revoked,
     CAPABILITY_AGENTS,
     TRUST_THRESHOLD,
-    AUTO_REVOKE_THRESHOLD,
 )
 
 logger = logging.getLogger(__name__)

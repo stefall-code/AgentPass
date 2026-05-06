@@ -10,10 +10,9 @@ from app.delegation.engine import (
     DelegationEngine, CAPABILITY_AGENTS, clear_used_tokens, USED_TOKENS,
     revoke_token_by_jti, revoke_tokens_by_user, revoke_tokens_by_agent,
     clear_revoked, get_revoked_list,
-    get_trust_score, update_trust_score, get_all_trust_scores, reset_trust_scores,
-    TRUST_PENALTY_ESCALATION, TRUST_PENALTY_DENY, TRUST_THRESHOLD,
-    AUTO_REVOKE_THRESHOLD, auto_revoke_agent, is_agent_auto_revoked,
-    clear_auto_revoked, get_auto_revoked_list, AUTO_REVOKED_AGENTS,
+    get_trust_score, get_all_trust_scores, reset_trust_scores,
+    TRUST_THRESHOLD,
+    AUTO_REVOKE_THRESHOLD, clear_auto_revoked, get_auto_revoked_list,
 )
 from app.delegation.revocation import track_token, assign_task_id
 from app.policy.dynamic_policy import evaluate_dynamic_policy
@@ -309,7 +308,6 @@ def delegate_token(req: DelegateRequest) -> DelegateResponse:
 
 @router.post("/check", response_model=CheckResponse)
 def check_delegation(req: CheckRequest) -> CheckResponse:
-    from app.delegation.engine import AGENT_TRUST_SCORE
     agent_id_for_trust = ""
     try:
         claims = _engine.decode_delegation_token(req.token)

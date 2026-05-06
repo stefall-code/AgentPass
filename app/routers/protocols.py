@@ -3,13 +3,10 @@ Protocol API Router — MCP + A2A endpoints
 """
 from __future__ import annotations
 
-import json
-from typing import Dict, Any, Optional
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
 
-from app.protocols.mcp_server import handle_mcp_request, get_mcp_server_info, MCP_TOOLS
+from app.protocols.mcp_server import handle_mcp_request, get_mcp_server_info
 from app.protocols.a2a_server import handle_a2a_request, get_agent_card, get_a2a_server_info, run_a2a_delegation_demo
 
 router = APIRouter(prefix="/protocols", tags=["MCP / A2A Protocols"])

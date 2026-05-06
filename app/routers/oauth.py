@@ -4,15 +4,15 @@ OAuth 2.0 / OIDC Delegation Extension API Router
 from __future__ import annotations
 
 import json
-from typing import Dict, Any, Optional, List
-from fastapi import APIRouter, Request
+from typing import Optional, List
+from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
 from app.security.oauth_delegation import (
     authorize_agent, exchange_code, token_exchange, validate_access_token,
     get_oidc_discovery, get_oauth_stats,
-    AGENT_OIDC_CLAIMS_NAMESPACE, AGENT_SCOPES, SCOPE_TO_CAPABILITY, NL_PERMISSION_MAP,
+    AGENT_OIDC_CLAIMS_NAMESPACE, NL_PERMISSION_MAP,
 )
 
 router = APIRouter(prefix="/oauth", tags=["OAuth 2.0 / OIDC"])

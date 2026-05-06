@@ -9,12 +9,11 @@ Translates natural language permission descriptions into auditable ACL rules:
 """
 from __future__ import annotations
 
-import json
 import logging
 import re
 import uuid
 from datetime import datetime, timezone
-from typing import Dict, Any, List, Optional, Tuple
+from typing import Dict, Any, List
 from dataclasses import dataclass
 
 logger = logging.getLogger("agent_system")

@@ -16,7 +16,6 @@ from __future__ import annotations
 
 import uuid
 import logging
-import time
 from datetime import datetime, timezone
 from typing import Dict, List, Any, Optional, Set
 from dataclasses import dataclass, field
@@ -24,9 +23,6 @@ from dataclasses import dataclass, field
 from app.delegation.engine import (
     revoke_token_by_jti,
     revoke_tokens_by_agent,
-    revoke_tokens_by_user,
-    auto_revoke_agent,
-    is_token_revoked,
     REVOKED_TOKENS,
     REVOKED_AGENTS,
     REVOKED_USERS,

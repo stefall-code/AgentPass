@@ -1,12 +1,11 @@
 import os
 import json
 import logging
-import hashlib
 import time
 import httpx
 from typing import Optional, Dict, Any
 
-from .iam_gateway import IAMTransport, mapRequestToAction, callIAMCheck, logAudit, get_audit_log, get_gateway_stats
+from .iam_gateway import IAMTransport, callIAMCheck, logAudit
 from app.config import settings
 
 logger = logging.getLogger(__name__)

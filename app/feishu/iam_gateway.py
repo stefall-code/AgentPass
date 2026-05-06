@@ -1,14 +1,12 @@
-import os
 import time
 import logging
-import json
 from typing import Dict, Any, Optional, List
 from dataclasses import dataclass, field
 from enum import Enum
 
 import httpx
 
-from app.delegation.engine import DelegationEngine, get_trust_score, get_all_trust_scores
+from app.delegation.engine import DelegationEngine, get_trust_score
 
 logger = logging.getLogger(__name__)
 

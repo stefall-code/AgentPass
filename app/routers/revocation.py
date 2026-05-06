@@ -3,21 +3,20 @@
 """
 from __future__ import annotations
 
-from typing import Dict, Any, List, Optional
+from typing import Optional
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
 from app.delegation.engine import (
     DelegationEngine, CAPABILITY_AGENTS,
     clear_used_tokens, clear_revoked, reset_trust_scores,
-    clear_auto_revoked, get_trust_score, revoke_token_by_jti,
+    clear_auto_revoked,
 )
 from app.delegation.revocation import (
     track_token, assign_task_id, revoke_4level,
     revoke_token_level, revoke_agent_level, revoke_task_level, revoke_chain_level,
     get_revocation_tree, get_all_relationships, get_revocation_stats,
-    clear_revocation_tracking, PARENT_CHILD_MAP, TASK_TOKEN_MAP,
-    TOKEN_AGENT_MAP, TOKEN_TASK_MAP,
+    clear_revocation_tracking, TASK_TOKEN_MAP,
 )
 
 router = APIRouter(prefix="/revocation", tags=["4-Level Revocation"])

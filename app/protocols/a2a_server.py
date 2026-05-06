@@ -18,10 +18,8 @@ from __future__ import annotations
 import json
 import logging
 import uuid
-import time
 from datetime import datetime, timezone
-from typing import Dict, List, Any, Optional
-from dataclasses import dataclass, field
+from typing import Dict, List, Any
 
 from app.config import settings
 
@@ -142,7 +140,6 @@ def get_agent_card() -> Dict[str, Any]:
     }
 
 
-import os
 
 
 def handle_a2a_request(request: Dict[str, Any]) -> Dict[str, Any]:

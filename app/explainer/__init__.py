@@ -152,7 +152,7 @@ def _explain_capability_check(agent_id: str, action: str, capabilities: List[str
             return {"step": "Capability 检查", "result": "fail", "detail": f"Agent {agent_id} 不具备能力 {action}，当前能力：{', '.join(agent_caps[:5])}", "icon": "❌"}
     if action in capabilities:
         return {"step": "Capability 检查", "result": "pass", "detail": f"Agent {agent_id} 具备能力 {action}", "icon": "✔️"}
-    return {"step": "Capability 检查", "result": "pass", "detail": f"能力检查通过", "icon": "✔️"}
+    return {"step": "Capability 检查", "result": "pass", "detail": "能力检查通过", "icon": "✔️"}
 
 
 def _explain_dynamic_policy(context: Dict[str, Any], decision: str) -> Dict[str, Any]:

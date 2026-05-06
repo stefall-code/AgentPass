@@ -15,7 +15,6 @@ import time
 import uuid
 from datetime import datetime, timezone
 from typing import Dict, Any, List, Optional
-from dataclasses import dataclass
 
 logger = logging.getLogger("agent_system")
 
