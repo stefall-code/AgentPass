@@ -126,7 +126,7 @@ var GOV = (function() {
         (events || []).slice().reverse().forEach(function(ev) {
             var platform = ev.platform || 'web';
             var explainData = {
-                agent_id: ev.agent || '',
+                agent_id: ev.agent_id || ev.agent || '',
                 action: ev.action || '',
                 decision: ev.result === 'success' ? 'allow' : 'deny',
                 reason: '',
@@ -145,7 +145,7 @@ var GOV = (function() {
             html += getPlatformTag(platform) + ' ' + getStatusBadge(ev.result);
             html += '<span class="event-time">' + formatTime(ev.timestamp) + '</span>';
             html += '</div>';
-            html += '<div class="event-detail">' + (ev.agent || '') + ' → ' + (ev.action || '') + (ev.trust_score != null ? ' | trust: ' + ev.trust_score.toFixed(2) : '') + '</div>';
+            html += '<div class="event-detail">' + (ev.agent_id || ev.agent || '') + ' → ' + (ev.action || '') + (ev.trust_score != null && ev.trust_score !== undefined ? ' | trust: ' + Number(ev.trust_score).toFixed(2) : '') + '</div>';
             html += '<div style="margin-top:6px">' + IAM_EXPLAIN.makeBtn('🧠 Explain', explainData) + '</div>';
             html += '</div>';
         });

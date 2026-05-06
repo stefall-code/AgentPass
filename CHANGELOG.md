@@ -2,6 +2,112 @@
 
 All notable changes to AgentPass are documented here.
 
+## \[2.6.1] — 2026-05-06
+
+### 🐛 Bug 修复
+
+- **飞书消息无响应** — `feishu_ws_bridge.py` 中 `sender.sender_id` 返回 `UserId` 对象而非字典，`.get()` 调用报 `AttributeError`，改为属性访问 + 字典兼容
+- **WebSocket 不断断线重连** — 三个WS端点 `timeout=15s` 后 `break` 断开，改为 `timeout=60s` + `TimeoutError` 时 `continue` 继续等待
+- **审计日志导出失败** — `StreamingResponse` 与 `BaseHTTPMiddleware` 不兼容，改为 `Response` 直接返回
+- **系统自动关闭** — `_IDLE_TIMEOUT=900`（15分钟）太短，改为环境变量控制，默认 `0`（不自动关闭）
+- **端口8000冲突** — 启动时自动检测并杀掉占用端口的旧进程（`_kill_port_occupier`）
+- **外部搜索无结果** — Google/Bing HTML结构变化导致正则失效，改用 DuckDuckGo HTML 版（纯HTML，国内可访问）
+- **飞书桥接进程残留** — 启动时自动清理旧的 `feishu_ws_bridge` 进程（`_kill_stale_bridges`），日志输出到 `feishu_ws_bridge.log`
+- **webhook去重冲突** — `_process_feishu_message_sync` 中的去重逻辑与webhook端点冲突，移除sync函数中的重复去重
+- **评委验收事件流bug** — `mainPushEvent()` 调用传了对象而非4个参数，导致事件流显示 `[object Object]`
+- **治理中心事件流bug** — `ev.agent` 应为 `ev.agent_id`，`trust_score.toFixed()` 对 `null` 报错
+
+### 后端改动
+
+- `feishu_ws_bridge.py` — `sender_id` 改为属性访问兼容 `UserId` 对象和字典
+- `app/routers/websocket.py` — 三个WS端点 timeout 15s→60s，TimeoutError break→continue
+- `app/routers/delegation.py` — `StreamingResponse` → `Response`
+- `app/routers/admin.py` — `StreamingResponse` → `Response`
+- `main.py` — `_IDLE_TIMEOUT` 默认0，新增 `_kill_port_occupier()`
+- `app/feishu/ws_client.py` — 新增 `_kill_stale_bridges()`，桥接日志输出到文件
+- `app/feishu/router.py` — webhook改用 `_process_feishu_message_sync`，移除重复去重
+- `app/orchestrator/orchestrator.py` — `_web_search()` 改用 DuckDuckGo HTML + Bing 降级
+
+### 前端改动
+
+- `frontend/audit.js` — 导出函数增加响应状态检查和空数据检查
+- `frontend/governance.js` — `ev.agent` → `ev.agent_id || ev.agent`，`trust_score` 空值保护
+- `frontend/app.js` — `mainPushEvent()` 评委验收调用修复
+
+## \[2.6.0] — 2026-05-06
+
+### 🔧 三Agent协作流程修复 — 完整闭环验证
+
+**问题**：三Agent协作时 external_agent 外部搜索被拒绝，协作报告空白，飞书交互默认使用 Mock 模式。
+
+**根因**：
+1. Root Token 被一次性消费 — `delegate()` 中 `check()` 消费父 Token 后，同一 Token 二次使用被判定为重放攻击
+2. External Agent 默认信任分 0.5 恰好等于阈值 — `trust_score >= TRUST_THRESHOLD` 刚好通过但边界不稳定
+3. `AUTO_REVOKED_AGENTS` 状态残留 — 重置信任分后未清理自动撤销记录，导致后续请求仍被拒绝
+4. 协作报告无展示区域 — governance.html 缺少 `collabReport` 容器
+5. 飞书 WebSocket 连接时序问题 — 连接未就绪时回退到 Mock 模式
+
+**修复**：
+- **独立 Root Token 签发** — 每步委派签发独立 root_token（step1 → data_agent, step2 → external_agent），避免 Token 复用导致的重放攻击误判
+- **External Agent 信任分提升** — 默认信任分从 0.5 提升至 0.7，确保稳定通过信任阈值
+- **Auto-Revoke 状态持久化清理** — `reset_trust_scores()` 同时清理 `AUTO_REVOKED_AGENTS` 和数据库中的撤销状态，恢复 Agent 正常访问
+- **协作报告展示区** — governance.html 新增 `collabReport` 容器，`runCollaboration()` 完成后填充报告内容
+- **飞书真实模式优先** — WebSocket 自动重连机制，连接就绪后自动切换到真实模式
+
+### 🛡️ 输出对齐检测 — 三层防护体系
+
+- **第1层：目标劫持检测（权重40%）** — 检测 Agent 输出是否偏离原始任务目标
+- **第2层：间接注入检测（权重35%）** — 检测输出中是否包含外部注入的恶意指令
+- **第3层：DLP 敏感信息检测（权重25%）** — 检测输出是否泄露敏感数据
+- **三级处置策略** — risk >= 0.7 拦截(block) / risk >= 0.4 警告(warn) / risk < 0.4 放行(allow)
+
+### 🔐 能力交集计算 — 最小权限原则
+
+- **委派能力交集** — 父 Agent 与子 Agent 能力取交集，确保委派后权限不超过父 Agent
+- **通配符处理** — 父 Agent 有通配符能力时，取子 Agent 能力子集
+- **委派权限传递** — 有 `delegate:*` 权限时允许传递子 Agent 全部能力
+- **无交集拒绝** — 无交集且无委派权限时直接拒绝，防止权限越界
+
+### 📊 仪表盘与前端优化
+
+- **Token 使用上限调整** — 默认上限从 30 改为 1000，Sign In All 即可获得充足 Token
+- **Agent 过滤清理** — 委派链图谱、风险仪表盘、安全仪表盘、治理中心过滤无效 test agent，只展示核心 Agent
+- **声誉排名修复** — 信任分 0-1 与 0-100 双尺度兼容，高分不再被误判为危险
+- **WebSocket 重连优化** — 指数退避重连策略（最大延迟 30s），首次断连才打印日志，减少控制台刷屏
+- **威胁态势图精简** — 只展示有数据的 Agent，移除空数据噪声
+
+### 📝 竞赛文档体系
+
+- **技术方案设计文档** — 系统架构、Access Token 设计、A2A 认证流程、API 接口定义
+- **安装与运行指南** — 环境要求、安装步骤、启动命令、验证方法
+- **演示脚本** — 每步操作指令 + 预期结果，评委可复现验证
+- **项目展示文档** — 核心代码展示、项目亮点、AI 工程化亮点
+- **评委评审答辩** — 完整性与价值、创新性、技术实现性三维度分析
+
+### 后端改动
+
+- **`app/delegation/engine.py`** — 独立 root token 签发、能力交集计算、auto-revoke 状态持久化清理、external_agent 信任分提升至 0.7
+- **`app/security/alignment.py`** — 三层输出对齐检测（目标劫持 + 间接注入 + DLP）
+- **`app/orchestrator/orchestrator.py`** — 三Agent协作编排（step1 data_agent + step2 external_agent + step3 汇总报告）
+- **`app/routers/insights.py`** — Agent 过滤逻辑优化，移除无效 test agent
+- **`app/routers/governance.py`** — 治理中心 Agent 过滤 + 协作报告数据接口
+- **`app/schemas.py`** — LoginRequest/BatchLoginItemRequest 默认 token 使用上限改为 1000
+
+### 前端改动
+
+- **`frontend/app.js`** — WebSocket 指数退避重连 + 日志降噪
+- **`frontend/governance.html`** — 新增 collabReport 展示区域
+- **`frontend/governance.js`** — 协作报告渲染逻辑
+- **`frontend/feishu.js`** — WebSocket 自动重连 + 真实模式优先
+
+### 新增文件
+
+- `技术方案设计文档.md` — 架构设计、Token 设计、认证流程、API 定义
+- `安装与运行指南.md` — 环境配置、安装步骤、启动验证
+- `演示脚本.md` — 分步操作指令 + 预期结果
+- `项目展示文档.md` — 核心代码、项目亮点、AI 亮点
+- `评委评审答辩.md` — 三维度评审分析
+
 ## \[2.5.0] — 2026-04-30
 
 ### 🏆 评委级展示体系重构 — 从"能做出来"到"可信地很强"

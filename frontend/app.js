@@ -1815,20 +1815,8 @@ async function runJudgeAcceptance() {
     if (data.steps && data.steps.length >= 3) {
       const step2 = data.steps[1];
       const step3 = data.steps[2];
-      mainPushEvent({
-        decision: 'allow',
-        agent_id: 'data_agent',
-        action: step2.name,
-        reason: step2.result,
-        timestamp: new Date().toISOString()
-      });
-      mainPushEvent({
-        decision: 'deny',
-        agent_id: 'external_agent',
-        action: step3.name,
-        reason: step3.result,
-        timestamp: new Date().toISOString()
-      });
+      mainPushEvent('allow', 'data_agent', step2.name || '', step2.result || '');
+      mainPushEvent('deny', 'external_agent', step3.name || '', step3.result || '');
     }
   } catch (e) {
     toast('验收失败', e.message, 'error');

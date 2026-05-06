@@ -865,9 +865,9 @@ def export_delegation_audit_logs(
     import io as _io
     import csv as _csv
     import json as _json
-    from fastapi.responses import StreamingResponse
+    from fastapi.responses import Response
 
-    logs = audit.fetch_logs_filtered(limit=5000, agent_id=agent_id, decision=decision, action=action)
+    logs = audit.fetch_logs_filtered(limit=2000, agent_id=agent_id, decision=decision, action=action)
 
     if format == "csv":
         output = _io.StringIO()
@@ -875,14 +875,14 @@ def export_delegation_audit_logs(
             writer = _csv.DictWriter(output, fieldnames=logs[0].keys())
             writer.writeheader()
             writer.writerows(logs)
-        return StreamingResponse(
-            _io.BytesIO(output.getvalue().encode("utf-8")),
+        return Response(
+            content=output.getvalue().encode("utf-8"),
             media_type="text/csv",
             headers={"Content-Disposition": "attachment; filename=audit_export.csv"},
         )
 
-    return StreamingResponse(
-        _io.BytesIO(_json.dumps(logs, ensure_ascii=False, indent=2).encode("utf-8")),
+    return Response(
+        content=_json.dumps(logs, ensure_ascii=False, indent=2).encode("utf-8"),
         media_type="application/json",
         headers={"Content-Disposition": "attachment; filename=audit_export.json"},
     )

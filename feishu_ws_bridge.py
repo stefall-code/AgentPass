@@ -34,12 +34,43 @@ def main():
             event = data.event if hasattr(data, "event") else data
             message = event.message if hasattr(event, "message") else {}
             sender = event.sender if hasattr(event, "sender") else {}
-            sender_id = sender.sender_id if hasattr(sender, "sender_id") else {}
 
-            user_id = sender_id.get("user_id", "") or sender_id.get("open_id", "") or "unknown"
-            message_content = message.get("content", "{}") if isinstance(message, dict) else "{}"
-            chat_id = message.get("chat_id", "") if isinstance(message, dict) else ""
-            message_id = message.get("message_id", "") if isinstance(message, dict) else ""
+            sender_id_raw = sender.sender_id if hasattr(sender, "sender_id") else {}
+            if hasattr(sender_id_raw, "open_id"):
+                open_id = sender_id_raw.open_id or ""
+                user_id_val = sender_id_raw.user_id or ""
+                union_id = sender_id_raw.union_id or ""
+            elif isinstance(sender_id_raw, dict):
+                open_id = sender_id_raw.get("open_id", "")
+                user_id_val = sender_id_raw.get("user_id", "")
+                union_id = sender_id_raw.get("union_id", "")
+            else:
+                open_id = ""
+                user_id_val = ""
+                union_id = ""
+
+            user_id = open_id or user_id_val or union_id or "unknown"
+
+            if hasattr(message, "content"):
+                message_content = message.content or "{}"
+            elif isinstance(message, dict):
+                message_content = message.get("content", "{}")
+            else:
+                message_content = "{}"
+
+            if hasattr(message, "chat_id"):
+                chat_id = message.chat_id or ""
+            elif isinstance(message, dict):
+                chat_id = message.get("chat_id", "")
+            else:
+                chat_id = ""
+
+            if hasattr(message, "message_id"):
+                message_id = message.message_id or ""
+            elif isinstance(message, dict):
+                message_id = message.get("message_id", "")
+            else:
+                message_id = ""
 
             try:
                 content_obj = json.loads(message_content) if isinstance(message_content, str) else message_content
@@ -50,10 +81,15 @@ def main():
             if not text.strip():
                 return
 
-            logger.info("Received: user=%s message='%s'", user_id, text[:50])
+            logger.info("Received: user=%s open_id=%s message='%s'", user_id_val, open_id, text[:50])
 
             import requests
             api_base = os.getenv("API_BASE", "http://127.0.0.1:8000")
+            sender_id_dict = {
+                "open_id": open_id,
+                "user_id": user_id_val,
+                "union_id": union_id,
+            }
             r = requests.post(
                 f"{api_base}/api/feishu/webhook",
                 json={
@@ -66,7 +102,7 @@ def main():
                             "message_type": "text",
                         },
                         "sender": {
-                            "sender_id": sender_id,
+                            "sender_id": sender_id_dict,
                             "type": "user",
                         },
                     },

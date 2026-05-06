@@ -163,7 +163,9 @@ def export_audit_logs(
     action: Optional[str] = Query(default=None),
     context: auth.AuthContext = Depends(require_admin_permission("view_audit", "admin:audit_export")),
 ):
-    logs = audit.fetch_logs_filtered(limit=1000, agent_id=agent_id, decision=decision, action=action)
+    from fastapi.responses import Response
+
+    logs = audit.fetch_logs_filtered(limit=2000, agent_id=agent_id, decision=decision, action=action)
 
     if format == "csv":
         output = io.StringIO()
@@ -171,14 +173,14 @@ def export_audit_logs(
             writer = csv.DictWriter(output, fieldnames=logs[0].keys())
             writer.writeheader()
             writer.writerows(logs)
-        return StreamingResponse(
-            io.BytesIO(output.getvalue().encode("utf-8")),
+        return Response(
+            content=output.getvalue().encode("utf-8"),
             media_type="text/csv",
             headers={"Content-Disposition": "attachment; filename=audit_logs.csv"},
         )
 
-    return StreamingResponse(
-        io.BytesIO(json.dumps(logs, ensure_ascii=False, indent=2).encode("utf-8")),
+    return Response(
+        content=json.dumps(logs, ensure_ascii=False, indent=2).encode("utf-8"),
         media_type="application/json",
         headers={"Content-Disposition": "attachment; filename=audit_logs.json"},
     )

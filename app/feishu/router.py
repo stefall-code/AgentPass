@@ -404,7 +404,7 @@ async def feishu_webhook(body: Dict[str, Any], background_tasks: BackgroundTasks
 
     _logger.info("Feishu webhook: user=%s message='%s'", user_id, message[:50])
 
-    background_tasks.add_task(_process_feishu_message, user_id, message, chat_id, message_id)
+    background_tasks.add_task(_process_feishu_message_sync, user_id, message, chat_id, message_id)
 
     return {"code": 0, "msg": "ok"}
 
@@ -877,15 +877,10 @@ def _run_async(coro):
 
 
 def _process_feishu_message_sync(user_id: str, message: str, chat_id: str = "", message_id: str = ""):
+    _logger.info("_process_feishu_message_sync called: user=%s msg='%s' chat=%s", user_id, message[:50], chat_id)
     global _processed_messages
     now = time.time()
     _processed_messages = {k: v for k, v in _processed_messages.items() if now - v < _MESSAGE_TTL}
-
-    dedup_key = message_id if message_id else f"{user_id}:{message[:100]}:{int(now / 30)}"
-    if dedup_key in _processed_messages:
-        _logger.info("WS Skipping duplicate message: %s", dedup_key)
-        return {"status": "skipped", "content": "duplicate", "reason": "already processed"}
-    _processed_messages[dedup_key] = now
 
     try:
         client = get_feishu_client()

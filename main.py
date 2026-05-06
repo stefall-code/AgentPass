@@ -67,13 +67,15 @@ logging.basicConfig(
 logger = logging.getLogger("agent_system")
 
 _last_ping_at: float = time.time()
-_IDLE_TIMEOUT = 900
+_IDLE_TIMEOUT = int(os.getenv("IDLE_TIMEOUT", "0"))
 
 
 async def _idle_shutdown_watcher():
+    if _IDLE_TIMEOUT <= 0:
+        return
     await asyncio.sleep(5)
     while True:
-        await asyncio.sleep(3)
+        await asyncio.sleep(30)
         if time.time() - _last_ping_at > _IDLE_TIMEOUT:
             logger.info("Browser disconnected for %ds, shutting down...", _IDLE_TIMEOUT)
             os.kill(os.getpid(), signal.SIGINT)
@@ -114,8 +116,7 @@ async def lifespan(app_: FastAPI):
     except Exception as e:
         logger.warning("Feishu WS bridge start failed (non-fatal): %s", e)
 
-    if os.getenv("ENVIRONMENT") != "test":
-        asyncio.create_task(_idle_shutdown_watcher())
+    asyncio.create_task(_idle_shutdown_watcher())
 
     logger.info("system started")
     yield
@@ -144,7 +145,7 @@ app = FastAPI(
         "A local demo for agent identity authentication, token-based access control, "
         "policy evaluation, and auditable secure execution."
     ),
-    version="v2.6",
+    version="v2.6.1",
     lifespan=lifespan,
 )
 
@@ -194,6 +195,32 @@ app.include_router(debug_router, prefix="/api")
 if __name__ == "__main__":
     import uvicorn
     import urllib.request
+
+    def _kill_port_occupier(port=8000):
+        import subprocess as _sp
+        try:
+            result = _sp.run(
+                ["netstat", "-aon"],
+                capture_output=True, text=True, timeout=5,
+            )
+            for line in result.stdout.split("\n"):
+                parts = line.split()
+                if len(parts) >= 5 and f":{port}" in parts[1] and "LISTENING" in line:
+                    pid = int(parts[-1])
+                    if pid != os.getpid() and pid != 0:
+                        logger.info("Port %d occupied by PID %d, killing...", port, pid)
+                        try:
+                            os.kill(pid, signal.SIGTERM)
+                        except OSError:
+                            try:
+                                _sp.run(["taskkill", "/F", "/PID", str(pid)], capture_output=True, timeout=5)
+                            except Exception:
+                                pass
+                        time.sleep(1)
+        except Exception:
+            pass
+
+    _kill_port_occupier(8000)
 
     def open_browser():
         url = "http://127.0.0.1:8000"

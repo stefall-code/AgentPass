@@ -552,13 +552,22 @@ async function verifyIntegrity() {
 async function exportAudit() {
     try {
         const resp = await fetch(`${AUDIT_BASE}/export?format=json`);
+        if (!resp.ok) {
+            const errText = await resp.text();
+            throw new Error(`HTTP ${resp.status}: ${errText.substring(0, 200)}`);
+        }
         const blob = await resp.blob();
+        if (blob.size === 0) {
+            throw new Error('导出数据为空');
+        }
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
         a.download = `audit_export_${new Date().toISOString().slice(0, 10)}.json`;
+        document.body.appendChild(a);
         a.click();
-        URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+        setTimeout(() => URL.revokeObjectURL(url), 1000);
     } catch (e) {
         alert('导出失败: ' + e.message);
     }

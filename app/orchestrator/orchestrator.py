@@ -518,36 +518,44 @@ def _execute_doc_agent(action: str, message: str = "") -> Dict[str, Any]:
 
 
 def _web_search(query: str, max_results: int = 5) -> list:
+    import urllib.parse
+    import re as _re
+    import httpx as _httpx
     results = []
+
     try:
-        import httpx as _httpx
-        search_url = f"https://www.google.com/search?q={_httpx._content.encode(query, 'utf-8').hex() if hasattr(_httpx._content, 'encode') else ''}"
+        search_url = f"https://html.duckduckgo.com/html/?q={urllib.parse.quote_plus(query)}"
         headers = {
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
             "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
         }
-        import urllib.parse
-        search_url = f"https://www.google.com/search?q={urllib.parse.quote_plus(query)}&num={max_results}"
         with _httpx.Client(timeout=15.0, follow_redirects=True) as client:
             resp = client.get(search_url, headers=headers)
             if resp.status_code == 200:
-                import re as _re
                 text = resp.text
-                url_pattern = r'href="/url\?q=(https?://[^&"]+)&[^"]*"'
-                urls = _re.findall(url_pattern, text)[:max_results]
-                title_pattern = r'<h3[^>]*>(.*?)</h3>'
-                titles = _re.findall(title_pattern, text, _re.DOTALL)[:max_results]
-                for i in range(min(len(titles), len(urls))):
-                    clean_title = _re.sub(r'<[^>]+>', '', titles[i]).strip()
-                    if clean_title and urls[i]:
-                        results.append({"title": clean_title, "url": urls[i]})
+                title_blocks = _re.findall(r'class="result__title"[^>]*>(.*?)</div>', text, _re.DOTALL)
+                snippet_blocks = _re.findall(r'class="result__snippet"[^>]*>(.*?)</a>', text, _re.DOTALL)
+                for i, block in enumerate(title_blocks[:max_results]):
+                    a_match = _re.search(r'<a[^>]+href="([^"]*)"[^>]*>(.*?)</a>', block, _re.DOTALL)
+                    if a_match:
+                        raw_url = a_match.group(1)
+                        title = _re.sub(r'<[^>]+>', '', a_match.group(2)).strip()
+                        uddg = _re.search(r'uddg=([^&"]+)', raw_url)
+                        if uddg:
+                            url = urllib.parse.unquote(uddg.group(1))
+                        else:
+                            url = raw_url if raw_url.startswith("http") else ""
+                        snippet = ""
+                        if i < len(snippet_blocks):
+                            snippet = _re.sub(r'<[^>]+>', '', snippet_blocks[i]).strip()
+                        if title and url:
+                            results.append({"title": title, "url": url, "snippet": snippet})
+        logger.info("DuckDuckGo search: %d results for '%s'", len(results), query)
     except Exception as e:
-        logger.warning("Google search failed: %s", e)
+        logger.warning("DuckDuckGo search failed: %s", e)
 
     if not results:
         try:
-            import httpx as _httpx
-            import urllib.parse
             search_url = f"https://www.bing.com/search?q={urllib.parse.quote_plus(query)}&count={max_results}"
             headers = {
                 "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
@@ -556,19 +564,20 @@ def _web_search(query: str, max_results: int = 5) -> list:
             with _httpx.Client(timeout=15.0, follow_redirects=True) as client:
                 resp = client.get(search_url, headers=headers)
                 if resp.status_code == 200:
-                    import re as _re
                     text = resp.text
-                    url_pattern = r'<a[^>]+href="(https?://[^"]+)"[^>]*>'
-                    title_pattern = r'<h2[^>]*><a[^>]*>(.*?)</a></h2>'
-                    titles = _re.findall(title_pattern, text, _re.DOTALL)[:max_results]
-                    urls_raw = _re.findall(url_pattern, text)
-                    urls = [u for u in urls_raw if "bing.com" not in u and "microsoft.com" not in u][:max_results]
-                    for i in range(min(len(titles), len(urls))):
-                        clean_title = _re.sub(r'<[^>]+>', '', titles[i]).strip()
-                        if clean_title:
-                            results.append({"title": clean_title, "url": urls[i] if i < len(urls) else ""})
-        except Exception as e2:
-            logger.warning("Bing search also failed: %s", e2)
+                    for m in _re.finditer(r'<li class="b_algo"[^>]*>(.*?)</li>', text, _re.DOTALL):
+                        block = m.group(1)
+                        title_m = _re.search(r'<a[^>]+href="(https?://[^"]+)"[^>]*>(.*?)</a>', block, _re.DOTALL)
+                        if title_m:
+                            url = title_m.group(1)
+                            title = _re.sub(r'<[^>]+>', '', title_m.group(2)).strip()
+                            if title and url and "bing.com" not in url and "microsoft.com" not in url:
+                                results.append({"title": title, "url": url, "snippet": ""})
+                        if len(results) >= max_results:
+                            break
+            logger.info("Bing search: %d results for '%s'", len(results), query)
+        except Exception as e:
+            logger.warning("Bing search failed: %s", e)
 
     return results
 

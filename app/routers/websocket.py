@@ -29,7 +29,7 @@ async def websocket_main(websocket: WebSocket):
         _update_heartbeat()
         while True:
             try:
-                data = await asyncio.wait_for(websocket.receive_text(), timeout=15.0)
+                data = await asyncio.wait_for(websocket.receive_text(), timeout=60.0)
                 ws_manager.touch()
                 _update_heartbeat()
                 if data == "ping":
@@ -37,7 +37,8 @@ async def websocket_main(websocket: WebSocket):
             except WebSocketDisconnect:
                 break
             except asyncio.TimeoutError:
-                break
+                _update_heartbeat()
+                continue
             except Exception:
                 break
     finally:
@@ -61,7 +62,7 @@ async def websocket_endpoint(websocket: WebSocket):
         _update_heartbeat()
         while True:
             try:
-                data = await asyncio.wait_for(websocket.receive_text(), timeout=15.0)
+                data = await asyncio.wait_for(websocket.receive_text(), timeout=60.0)
                 ws_manager.touch()
                 _update_heartbeat()
                 if data == "ping":
@@ -69,7 +70,8 @@ async def websocket_endpoint(websocket: WebSocket):
             except WebSocketDisconnect:
                 break
             except asyncio.TimeoutError:
-                break
+                _update_heartbeat()
+                continue
             except Exception:
                 break
     finally:
@@ -94,13 +96,14 @@ async def websocket_audit(websocket: WebSocket):
         _update_heartbeat()
         while True:
             try:
-                data = await asyncio.wait_for(websocket.receive_text(), timeout=15.0)
+                data = await asyncio.wait_for(websocket.receive_text(), timeout=60.0)
                 ws_manager.touch()
                 _update_heartbeat()
             except WebSocketDisconnect:
                 break
             except asyncio.TimeoutError:
-                break
+                _update_heartbeat()
+                continue
             except Exception:
                 break
     finally:
